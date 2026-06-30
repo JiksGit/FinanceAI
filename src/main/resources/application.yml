@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: dashboard
+  profiles:
+    active: local
+
+server:
+  port: 8080
+
+jwt:
+  secret: ${JWT_SECRET:local-dev-only-secret-key-please-change-in-prod-minimum-256-bits}
+  access-token-expiration: ${JWT_ACCESS_EXPIRATION:3600000}
+  refresh-token-expiration: ${JWT_REFRESH_EXPIRATION:1209600000}
+
+exim:
+  api-key: ${EXIM_API_KEY:}
+  base-url: https://oapi.koreaexim.go.kr/site/program/financial/exchangeJSON
+
+alpha-vantage:
+  api-key: ${ALPHA_VANTAGE_API_KEY:}
+  base-url: https://www.alphavantage.co/query
+  mock-enabled: ${STOCK_MOCK_MODE:true}
+
+signal:
+  mail-enabled: ${SIGNAL_MAIL_ENABLED:false}
+  cron: ${SIGNAL_CRON:0 30 9 * * MON-FRI}
+
+openai:
+  api-key: ${OPENAI_API_KEY:}
+  base-url: https://api.openai.com/v1/chat/completions
+  model: gpt-4o-mini
