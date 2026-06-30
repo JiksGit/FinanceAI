@@ -4,6 +4,7 @@ import com.finance.dashboard.dto.response.SignalResponse;
 import com.finance.dashboard.dto.response.StockHistoryResponse;
 import com.finance.dashboard.entity.FavoriteStock;
 import com.finance.dashboard.entity.StockSignal;
+import com.finance.dashboard.exception.CustomException;
 import com.finance.dashboard.repository.FavoriteStockRepository;
 import com.finance.dashboard.repository.StockSignalRepository;
 import com.finance.dashboard.repository.UserRepository;
@@ -29,8 +30,8 @@ public class SignalService {
     private static final String INDICATOR = "SMA5_SMA20_CROSS";
     private static final int SHORT_PERIOD = 5;
     private static final int LONG_PERIOD = 20;
-    /** 데모용 추적 대상. 실서비스라면 사용자가 즐겨찾기한 모든 종목으로 확장. */
-    private static final List<String> TRACKED_SYMBOLS = List.of("AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "NVDA");
+    /** 즐겨찾기한 사용자가 아직 없을 때 사용할 기본 관찰 목록. */
+    private static final List<String> DEFAULT_WATCHLIST = List.of("AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "NVDA");
 
     private final StockService stockService;
     private final StockSignalRepository stockSignalRepository;
@@ -48,9 +49,18 @@ public class SignalService {
     @Transactional
     public List<SignalResponse> generateSignals() {
         List<SignalResponse> generated = new ArrayList<>();
+        List<String> trackedSymbols = resolveTrackedSymbols();
 
-        for (String symbol : TRACKED_SYMBOLS) {
-            computeSignal(symbol).ifPresent(signal -> {
+        for (String symbol : trackedSymbols) {
+            Optional<DetectedSignal> detected;
+            try {
+                detected = computeSignal(symbol);
+            } catch (CustomException e) {
+                log.warn("시그널 계산 스킵 ({}): {}", symbol, e.getMessage());
+                continue;
+            }
+
+            detected.ifPresent(signal -> {
                 boolean alreadyExists = stockSignalRepository
                         .findByStockSymbolAndSignalDateAndIndicator(signal.stockSymbol(), signal.signalDate(), INDICATOR)
                         .isPresent();
@@ -73,8 +83,13 @@ public class SignalService {
             });
         }
 
-        log.info("일일 시그널 생성 완료: {}건", generated.size());
+        log.info("일일 시그널 생성 완료: {}건 (추적 종목 {}개)", generated.size(), trackedSymbols.size());
         return generated;
+    }
+
+    private List<String> resolveTrackedSymbols() {
+        List<String> favoritedSymbols = favoriteStockRepository.findDistinctStockSymbols();
+        return favoritedSymbols.isEmpty() ? DEFAULT_WATCHLIST : favoritedSymbols;
     }
 
     public List<SignalResponse> getRecentSignals() {
