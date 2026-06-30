@@ -31,6 +31,8 @@ services:
       - MAIL_PASSWORD=${MAIL_PASSWORD}
       - SIGNAL_MAIL_ENABLED=${SIGNAL_MAIL_ENABLED:-false}
       - SIGNAL_CRON=${SIGNAL_CRON:-0 30 9 * * MON-FRI}
+      - SIGNAL_SCHEDULER_ENABLED=${SIGNAL_SCHEDULER_ENABLED:-true}
+      - SERVICE_TOKEN=${SERVICE_TOKEN}
     depends_on:
       mysql:
         condition: service_healthy

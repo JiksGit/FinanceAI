@@ -1,6 +1,7 @@
 package com.finance.dashboard.config;
 
 import com.finance.dashboard.security.JwtAuthenticationFilter;
+import com.finance.dashboard.security.ServiceTokenAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -21,6 +22,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final ServiceTokenAuthenticationFilter serviceTokenAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
@@ -31,12 +33,14 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers("/api/auth/**").permitAll()
                         .requestMatchers("/api/exchange/**").permitAll()
+                        .requestMatchers("/api/internal/**").authenticated()
                         .requestMatchers("/api/stock/favorites", "/api/stock/favorites/**").authenticated()
                         .requestMatchers("/api/stock/search", "/api/stock/{symbol}", "/api/stock/{symbol}/history").permitAll()
                         .requestMatchers("/api/signals/my", "/api/signals/generate").authenticated()
                         .requestMatchers("/api/signals").permitAll()
                         .anyRequest().authenticated()
                 )
+                .addFilterBefore(serviceTokenAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();

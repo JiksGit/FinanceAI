@@ -1,5 +1,6 @@
 package com.finance.dashboard.service;
 
+import com.finance.dashboard.config.SignalConfig;
 import com.finance.dashboard.dto.response.SignalResponse;
 import com.finance.dashboard.dto.response.StockHistoryResponse;
 import com.finance.dashboard.entity.FavoriteStock;
@@ -39,9 +40,14 @@ public class SignalService {
     private final UserRepository userRepository;
     private final OpenAiService openAiService;
     private final EmailService emailService;
+    private final SignalConfig signalConfig;
 
     @Scheduled(cron = "${signal.cron}", zone = "Asia/Seoul")
     public void generateDailySignals() {
+        if (!signalConfig.schedulerEnabled()) {
+            log.debug("인스턴스 내장 스케줄러가 비활성화되어 있습니다 (signal.scheduler-enabled=false). 외부 트리거(EventBridge 등)를 사용하세요.");
+            return;
+        }
         log.info("일일 시그널 생성 시작");
         generateSignals();
     }

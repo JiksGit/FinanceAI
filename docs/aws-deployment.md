@@ -59,7 +59,7 @@
 
 추가로 일반 텍스트 보안 암호 하나 더 생성:
 - 이름: `financeai/app-secrets`
-- 키-값: `JWT_SECRET`, `EXIM_API_KEY`, `OPENAI_API_KEY`, `ALPHA_VANTAGE_API_KEY` 등
+- 키-값: `JWT_SECRET`, `EXIM_API_KEY`, `OPENAI_API_KEY`, `ALPHA_VANTAGE_API_KEY`, `SERVICE_TOKEN`(아무 긴 랜덤 문자열, Lambda가 내부 API 호출 시 쓸 공유 토큰) 등
 
 ### 1-5. IAM Role 생성 (EC2용)
 **IAM 콘솔 → 역할 생성 → AWS 서비스 → EC2**
@@ -96,9 +96,11 @@
   systemctl enable --now docker
   usermod -aG docker ec2-user
 
+  SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id financeai/app-secrets --region ap-northeast-2 --query SecretString --output text)
   DB_PASSWORD=$(aws secretsmanager get-secret-value --secret-id financeai/rds --region ap-northeast-2 --query SecretString --output text | jq -r .password)
-  JWT_SECRET=$(aws secretsmanager get-secret-value --secret-id financeai/app-secrets --region ap-northeast-2 --query SecretString --output text | jq -r .JWT_SECRET)
-  EXIM_API_KEY=$(aws secretsmanager get-secret-value --secret-id financeai/app-secrets --region ap-northeast-2 --query SecretString --output text | jq -r .EXIM_API_KEY)
+  JWT_SECRET=$(echo "$SECRET_JSON" | jq -r .JWT_SECRET)
+  EXIM_API_KEY=$(echo "$SECRET_JSON" | jq -r .EXIM_API_KEY)
+  SERVICE_TOKEN=$(echo "$SECRET_JSON" | jq -r .SERVICE_TOKEN)
 
   docker run -d --name financeai-backend -p 8080:8080 \
     -e DB_HOST=<RDS 엔드포인트> \
@@ -108,9 +110,12 @@
     -e DB_PASSWORD="$DB_PASSWORD" \
     -e JWT_SECRET="$JWT_SECRET" \
     -e EXIM_API_KEY="$EXIM_API_KEY" \
+    -e SERVICE_TOKEN="$SERVICE_TOKEN" \
+    -e SIGNAL_SCHEDULER_ENABLED=false \
     -e SPRING_PROFILES_ACTIVE=local \
     <ECR 이미지 URI 또는 Docker Hub 이미지>:latest
   ```
+  > `SIGNAL_SCHEDULER_ENABLED=false`로 인스턴스 내장 크론을 꺼야 합니다 — ASG로 2대 이상 떠 있으면 인스턴스마다 중복 실행되기 때문입니다. Phase 2의 Lambda+EventBridge가 그 역할을 대신합니다.
   > 이미지는 ECR(Elastic Container Registry)에 푸시해두는 걸 권장 — 이것도 SAA 범위(ECR)입니다. `docker tag` → `docker push`로 올리고 위 user data에서 그 URI를 참조하세요.
 
 ### 1-7. Application Load Balancer 생성
@@ -167,9 +172,9 @@ curl http://<ALB DNS 이름>/api/exchange/today
 코드 (Node.js 예시):
 ```javascript
 export const handler = async () => {
-  const res = await fetch("http://<ALB DNS 이름>/api/signals/generate", {
+  const res = await fetch("http://<ALB DNS 이름>/api/internal/signals/generate", {
     method: "POST",
-    headers: { "Authorization": `Bearer ${process.env.SERVICE_TOKEN}` }
+    headers: { "X-Service-Token": process.env.SERVICE_TOKEN }
   });
   const body = await res.json();
   console.log("generated signals:", body);
@@ -177,9 +182,9 @@ export const handler = async () => {
 };
 ```
 
-> **주의**: 현재 `/api/signals/generate`는 사용자 JWT 인증이 필요합니다. Lambda가 호출할 수 있도록 백엔드에 **서비스 계정용 토큰** 또는 **별도의 내부 API 키 인증**을 추가하는 작업이 선행되어야 합니다 (예: `X-Internal-Token` 헤더 검증하는 별도 경로, 또는 satisfies-only-from-ALB-internal-network 같은 네트워크 레벨 제한). 이 부분은 Phase 2 시작 전에 백엔드 코드를 같이 손볼게요.
+백엔드에 이미 `/api/internal/signals/generate` 엔드포인트가 구현되어 있습니다 ([InternalController.java](../src/main/java/com/finance/dashboard/controller/InternalController.java)). 일반 사용자 JWT가 아니라 `X-Service-Token` 헤더를 [ServiceTokenAuthenticationFilter](../src/main/java/com/finance/dashboard/security/ServiceTokenAuthenticationFilter.java)가 검증하는 별도 경로이므로 Lambda가 그대로 호출하면 됩니다.
 
-환경 변수: `SERVICE_TOKEN` (Secrets Manager에서 가져오거나 Lambda 환경변수에 직접)
+환경 변수: `SERVICE_TOKEN` — Secrets Manager(`financeai/app-secrets`)의 값과 **반드시 동일해야** 합니다. Lambda 콘솔에서 직접 입력하거나, 실행 역할에 `secretsmanager:GetSecretValue` 권한을 추가해 런타임에 가져오도록 구성하세요.
 
 ### 2-2. EventBridge Scheduler 생성
 **Amazon EventBridge 콘솔 → Scheduler → 일정 생성**

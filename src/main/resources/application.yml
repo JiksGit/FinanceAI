@@ -24,8 +24,13 @@ alpha-vantage:
 signal:
   mail-enabled: ${SIGNAL_MAIL_ENABLED:false}
   cron: ${SIGNAL_CRON:0 30 9 * * MON-FRI}
+  # ASG 등 다중 인스턴스 환경에서는 false로 끄고 EventBridge+Lambda가 대신 트리거하도록 한다.
+  scheduler-enabled: ${SIGNAL_SCHEDULER_ENABLED:true}
 
 openai:
   api-key: ${OPENAI_API_KEY:}
   base-url: https://api.openai.com/v1/chat/completions
   model: gpt-4o-mini
+
+service:
+  token: ${SERVICE_TOKEN:}
