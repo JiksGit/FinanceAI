@@ -41,5 +41,9 @@ out/
 .env.*
 !.env.example
 
+### Dev scripts (contain local secrets) ###
+dev-backend.ps1
+dev-frontend.ps1
+
 ### Claude Code ###
 .claude/
