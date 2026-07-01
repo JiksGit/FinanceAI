@@ -58,7 +58,10 @@ function SignalRow({ signal }) {
   return (
     <div className="flex items-center justify-between py-2.5">
       <div>
-        <span className="text-sm font-medium text-slate-800">{signal.stockSymbol}</span>
+        <span className="text-sm font-medium text-slate-800">
+          {signal.stockName || signal.stockSymbol}
+        </span>
+        <span className="ml-2 text-xs text-slate-400 font-mono">{signal.stockSymbol}</span>
         <span className="ml-2 text-xs text-slate-400">{signal.signalDate}</span>
       </div>
       <span
@@ -283,7 +286,7 @@ export default function HomePage() {
             종목 검색 →
           </Link>
         </div>
-        <MarketTopTable limit={50} />
+        <MarketTopTable limit={50} linkToDetail />
       </div>
 
       {/* 하단: 환율 */}

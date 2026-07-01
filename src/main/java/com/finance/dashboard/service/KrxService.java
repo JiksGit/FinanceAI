@@ -3,6 +3,7 @@ package com.finance.dashboard.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finance.dashboard.config.KrxConfig;
+import com.finance.dashboard.dto.response.StockDetailResponse;
 import com.finance.dashboard.entity.KrxDailyPrice;
 import com.finance.dashboard.entity.KrxStockInfo;
 import com.finance.dashboard.repository.KrxDailyPriceRepository;
@@ -279,6 +280,134 @@ public class KrxService {
         // sentinel null 제거
         result.removeIf(p -> p == null);
         return result.subList(0, Math.min(result.size(), days));
+    }
+
+    // ── 종목 상세 (투자정보 포함) ─────────────────────────────────
+
+    public StockDetailResponse getStockDetail(String stockCode) {
+        LocalDate date = resolveLatestTradingDate();
+        loadAllPrices(date);
+
+        KrxDailyPrice price = dailyPriceRepository
+                .findByStockCodeAndTradeDate(stockCode, date)
+                .orElseThrow(() -> new RuntimeException("종목 데이터 없음: " + stockCode));
+        KrxStockInfo info = stockInfoRepository.findById(stockCode).orElse(null);
+
+        // Naver Finance main 페이지에서 투자지표 스크래핑
+        NaverFinanceInfo naver = scrapeNaverFinanceInfo(stockCode);
+
+        return new StockDetailResponse(
+                price.getStockCode(),
+                price.getStockName(),
+                price.getMarket(),
+                info != null ? info.getSector() : null,
+                price.getClosePrice(),
+                price.getPriceChange(),
+                price.getChangeRate(),
+                price.getOpenPrice(),
+                price.getHighPrice(),
+                price.getLowPrice(),
+                price.getVolume(),
+                price.getMarketCap(),
+                naver.per(),
+                naver.eps(),
+                naver.pbr(),
+                naver.bps(),
+                naver.roe(),
+                naver.dividendYield(),
+                naver.high52w(),
+                naver.low52w(),
+                naver.sharesOutstanding(),
+                naver.foreignRatio()
+        );
+    }
+
+    private record NaverFinanceInfo(
+            BigDecimal per, BigDecimal eps, BigDecimal pbr, BigDecimal bps,
+            BigDecimal roe, BigDecimal dividendYield,
+            long high52w, long low52w, long sharesOutstanding, BigDecimal foreignRatio) {
+        static NaverFinanceInfo empty() {
+            return new NaverFinanceInfo(null, null, null, null, null, null, 0L, 0L, 0L, null);
+        }
+    }
+
+    private NaverFinanceInfo scrapeNaverFinanceInfo(String stockCode) {
+        try {
+            String url = "https://finance.naver.com/item/main.naver?code=" + stockCode;
+            Document doc = Jsoup.connect(url)
+                    .userAgent(USER_AGENT)
+                    .header("Accept-Language", "ko-KR,ko;q=0.9")
+                    .timeout(10_000)
+                    .get();
+
+            // th 텍스트로 인접 td 값 찾기 (robust)
+            java.util.Map<String, String> data = new java.util.HashMap<>();
+            for (Element th : doc.select("th, dt")) {
+                String key = th.text().replaceAll("[\\s\\(\\)]", "").trim();
+                Element sibling = th.nextElementSibling();
+                if (sibling != null) {
+                    data.put(key, sibling.text().replaceAll("[^0-9.\\-]", "").trim());
+                }
+            }
+
+            // 52주 범위: 별도 파싱 (형식: "93,400 47,800" 또는 두 td)
+            long high52w = 0L, low52w = 0L;
+            for (Element tr : doc.select("table tr")) {
+                String rowText = tr.text();
+                if (rowText.contains("52주최고") || rowText.contains("52주 최고")) {
+                    Elements tds = tr.select("td");
+                    if (tds.size() >= 2) {
+                        high52w = parseLong(tds.get(0).text());
+                        low52w  = parseLong(tds.get(1).text());
+                    } else if (tds.size() == 1) {
+                        String[] parts = tds.get(0).text().split("\\s+");
+                        if (parts.length >= 2) {
+                            high52w = parseLong(parts[0]);
+                            low52w  = parseLong(parts[1]);
+                        }
+                    }
+                    break;
+                }
+            }
+
+            // 상장주식수
+            long shares = 0L;
+            for (Element tr : doc.select("table tr")) {
+                if (tr.text().contains("상장주식수")) {
+                    Element td = tr.selectFirst("td");
+                    if (td != null) shares = parseLong(td.text());
+                    break;
+                }
+            }
+
+            // 외국인소진률
+            BigDecimal foreignRatio = null;
+            for (Element tr : doc.select("table tr")) {
+                if (tr.text().contains("외국인소진률") || tr.text().contains("외인소진")) {
+                    Element td = tr.selectFirst("td");
+                    if (td != null) foreignRatio = parseBD(td.text());
+                    break;
+                }
+            }
+
+            return new NaverFinanceInfo(
+                    parseOrNull(data.get("PER")),
+                    parseOrNull(data.get("EPS")),
+                    parseOrNull(data.get("PBR")),
+                    parseOrNull(data.get("BPS")),
+                    parseOrNull(data.get("ROE")),
+                    parseOrNull(data.get("배당수익률")),
+                    high52w, low52w, shares, foreignRatio
+            );
+        } catch (Exception e) {
+            log.warn("투자정보 스크래핑 실패 [{}]: {}", stockCode, e.getMessage());
+            return NaverFinanceInfo.empty();
+        }
+    }
+
+    private BigDecimal parseOrNull(String raw) {
+        if (raw == null || raw.isBlank() || raw.equals("-")) return null;
+        try { return new BigDecimal(raw); } catch (Exception e) { return null; }
     }
 
     // ── 시가총액 TOP N ────────────────────────────────────────────

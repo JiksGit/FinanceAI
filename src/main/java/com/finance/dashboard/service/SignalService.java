@@ -7,6 +7,7 @@ import com.finance.dashboard.entity.FavoriteStock;
 import com.finance.dashboard.entity.StockSignal;
 import com.finance.dashboard.exception.CustomException;
 import com.finance.dashboard.repository.FavoriteStockRepository;
+import com.finance.dashboard.repository.KrxStockInfoRepository;
 import com.finance.dashboard.repository.StockSignalRepository;
 import com.finance.dashboard.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -48,6 +49,7 @@ public class SignalService {
     private final StockService stockService;
     private final StockSignalRepository stockSignalRepository;
     private final FavoriteStockRepository favoriteStockRepository;
+    private final KrxStockInfoRepository stockInfoRepository;
     private final UserRepository userRepository;
     private final OpenAiService openAiService;
     private final EmailService emailService;
@@ -111,8 +113,14 @@ public class SignalService {
 
     public List<SignalResponse> getRecentSignals() {
         return stockSignalRepository.findTop50ByOrderByCreatedAtDesc().stream()
-                .map(SignalResponse::from)
+                .map(s -> SignalResponse.from(s, resolveStockName(s.getStockSymbol())))
                 .toList();
+    }
+
+    private String resolveStockName(String stockCode) {
+        return stockInfoRepository.findById(stockCode)
+                .map(info -> info.getStockName())
+                .orElse(stockCode);
     }
 
     public List<SignalResponse> getMySignals(Long userId) {
@@ -125,7 +133,7 @@ public class SignalService {
         }
 
         return stockSignalRepository.findByStockSymbolInOrderByCreatedAtDesc(symbols).stream()
-                .map(SignalResponse::from)
+                .map(s -> SignalResponse.from(s, resolveStockName(s.getStockSymbol())))
                 .toList();
     }
 

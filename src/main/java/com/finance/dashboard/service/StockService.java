@@ -228,10 +228,17 @@ public class StockService {
         if (favoriteStockRepository.existsByUserIdAndStockSymbol(userId, stockCode)) {
             throw new CustomException(ErrorCode.FAVORITE_ALREADY_EXISTS);
         }
+        // 이름이 없으면 KrxStockInfo에서 자동 조회
+        String name = request.stockName();
+        if (name == null || name.isBlank()) {
+            name = stockInfoRepository.findById(stockCode)
+                    .map(info -> info.getStockName())
+                    .orElse(stockCode);
+        }
         favoriteStockRepository.save(FavoriteStock.builder()
                 .userId(userId)
                 .stockSymbol(stockCode)
-                .stockName(request.stockName())
+                .stockName(name)
                 .build());
     }
 

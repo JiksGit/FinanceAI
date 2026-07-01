@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import {
   addFavorite,
   getFavorites,
@@ -309,6 +310,7 @@ function StockDetailPanel({ symbol, favorites, isAuthenticated, onFavoriteToggle
 // ── 메인 페이지 ───────────────────────────────────────────
 export default function StockPage() {
   const { isAuthenticated } = useAuth()
+  const navigate = useNavigate()
   const [selectedCode, setSelectedCode] = useState(null)
   const [favorites, setFavorites] = useState([])
   const [portfolioSummary, setPortfolioSummary] = useState(null)
@@ -369,7 +371,7 @@ export default function StockPage() {
           {activeTab === 'market' ? (
             <MarketTopTable
               limit={100}
-              onSelect={setSelectedCode}
+              onSelect={(code) => navigate(`/stocks/${code}`)}
               selectedCode={selectedCode}
             />
           ) : (

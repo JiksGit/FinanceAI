@@ -6,6 +6,7 @@ import java.time.LocalDateTime;
 
 public record SignalResponse(
         String stockSymbol,
+        String stockName,
         StockSignal.SignalType signalType,
         String indicator,
         String signalDate,
@@ -13,8 +14,13 @@ public record SignalResponse(
         LocalDateTime createdAt
 ) {
     public static SignalResponse from(StockSignal signal) {
+        return from(signal, null);
+    }
+
+    public static SignalResponse from(StockSignal signal, String stockName) {
         return new SignalResponse(
                 signal.getStockSymbol(),
+                stockName,
                 signal.getSignalType(),
                 signal.getIndicator(),
                 signal.getSignalDate(),

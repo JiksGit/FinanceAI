@@ -10,6 +10,7 @@ import com.finance.dashboard.dto.response.StockResponse;
 import com.finance.dashboard.dto.response.StockSearchResult;
 import com.finance.dashboard.dto.response.TopStockResponse;
 import com.finance.dashboard.security.UserPrincipal;
+import com.finance.dashboard.dto.response.StockDetailResponse;
 import com.finance.dashboard.service.KrxService;
 import com.finance.dashboard.service.StockService;
 import jakarta.validation.Valid;
@@ -69,6 +70,11 @@ public class StockController {
     ) {
         stockService.removeFavorite(principal.getUserId(), symbol);
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{symbol}/detail")
+    public StockDetailResponse getStockDetail(@PathVariable String symbol) {
+        return krxService.getStockDetail(symbol);
     }
 
     @GetMapping("/{symbol}")

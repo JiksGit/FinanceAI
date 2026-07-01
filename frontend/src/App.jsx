@@ -5,6 +5,7 @@ import ProtectedRoute from './components/common/ProtectedRoute'
 import SessionExpiredModal from './components/common/SessionExpiredModal'
 import HomePage from './pages/HomePage'
 import StockPage from './pages/StockPage'
+import StockDetailPage from './pages/StockDetailPage'
 import SignalsPage from './pages/SignalsPage'
 import AiPage from './pages/AiPage'
 import LoginPage from './pages/LoginPage'
@@ -25,6 +26,7 @@ function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/stocks" element={<StockPage />} />
+          <Route path="/stocks/:code" element={<StockDetailPage />} />
           <Route path="/signals" element={<SignalsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route

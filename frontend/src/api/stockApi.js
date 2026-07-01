@@ -26,3 +26,6 @@ export const getStockNews = (symbol) =>
 
 export const getTopStocks = (market = '', limit = 50) =>
   api.get('/stock/market/top', { params: { market, limit } }).then((res) => res.data)
+
+export const getStockDetail = (symbol) =>
+  api.get(`/stock/${symbol}/detail`).then((res) => res.data)

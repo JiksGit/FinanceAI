@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getTopStocks } from '../../api/stockApi'
 import LoadingSpinner from '../common/LoadingSpinner'
 
@@ -27,7 +28,8 @@ export function priceBg(change) {
   return 'bg-slate-100 text-slate-500'
 }
 
-export default function MarketTopTable({ limit = 50, onSelect, selectedCode }) {
+export default function MarketTopTable({ limit = 50, onSelect, selectedCode, linkToDetail = false }) {
+  const navigate = useNavigate()
   const [stocks, setStocks] = useState([])
   const [market, setMarket] = useState('')
   const [loading, setLoading] = useState(true)
@@ -85,7 +87,10 @@ export default function MarketTopTable({ limit = 50, onSelect, selectedCode }) {
                 return (
                   <tr
                     key={stock.stockCode}
-                    onClick={() => onSelect?.(stock.stockCode)}
+                    onClick={() => {
+                      if (linkToDetail) navigate(`/stocks/${stock.stockCode}`)
+                      else onSelect?.(stock.stockCode)
+                    }}
                     className={`border-b border-slate-50 cursor-pointer transition-colors ${
                       isSelected
                         ? 'bg-indigo-50 border-indigo-100'
