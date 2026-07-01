@@ -8,20 +8,26 @@ const MARKETS = [
   { label: 'KOSDAQ', value: 'KOSDAQ' },
 ]
 
-function formatKRW(value) {
-  if (!value) return '-'
-  return Number(value).toLocaleString('ko-KR') + '원'
+export function formatMarketCap(value) {
+  if (!value || value === 0) return '-'
+  // value 단위: 억원
+  if (value >= 10000) return `${(value / 10000).toFixed(1)}조`
+  return `${Number(value).toLocaleString('ko-KR')}억`
 }
 
-function formatMarketCap(value) {
-  if (!value) return '-'
-  const trillion = value / 1_000_000_000_000
-  if (trillion >= 1) return `${trillion.toFixed(1)}조`
-  const billion = value / 100_000_000
-  return `${billion.toFixed(0)}억`
+export function priceColor(change) {
+  if (change > 0) return 'text-red-500'
+  if (change < 0) return 'text-blue-500'
+  return 'text-slate-400'
 }
 
-export default function MarketTopTable({ limit = 50 }) {
+export function priceBg(change) {
+  if (change > 0) return 'bg-red-50 text-red-600'
+  if (change < 0) return 'bg-blue-50 text-blue-600'
+  return 'bg-slate-100 text-slate-500'
+}
+
+export default function MarketTopTable({ limit = 50, onSelect, selectedCode }) {
   const [stocks, setStocks] = useState([])
   const [market, setMarket] = useState('')
   const [loading, setLoading] = useState(true)
@@ -35,73 +41,86 @@ export default function MarketTopTable({ limit = 50 }) {
   }, [market, limit])
 
   return (
-    <div>
-      {/* 탭 */}
-      <div className="mb-4 flex gap-2">
+    <div className="flex h-full flex-col">
+      {/* 시장 탭 */}
+      <div className="mb-3 flex gap-1.5">
         {MARKETS.map((m) => (
           <button
             key={m.value}
             onClick={() => setMarket(m.value)}
-            className={`rounded-md px-3 py-1.5 text-sm ${
+            className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
               market === m.value
-                ? 'bg-indigo-600 text-white'
+                ? 'bg-slate-800 text-white'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
             {m.label}
           </button>
         ))}
+        <span className="ml-auto text-xs text-slate-400 self-center">
+          {stocks.length > 0 && `${stocks.length}종목`}
+        </span>
       </div>
 
       {loading ? (
         <LoadingSpinner />
       ) : (
-        <div className="overflow-x-auto">
+        <div className="overflow-y-auto flex-1">
           <table className="w-full text-sm">
-            <thead>
+            <thead className="sticky top-0 bg-slate-50 z-10">
               <tr className="border-b border-slate-200 text-xs text-slate-400">
-                <th className="py-2 text-left font-medium">순위</th>
-                <th className="py-2 text-left font-medium">종목코드</th>
-                <th className="py-2 text-left font-medium">종목명</th>
-                <th className="py-2 text-left font-medium">시장</th>
-                <th className="py-2 text-right font-medium">현재가</th>
-                <th className="py-2 text-right font-medium">등락</th>
-                <th className="py-2 text-right font-medium">거래량</th>
-                <th className="py-2 text-right font-medium">시가총액</th>
+                <th className="py-2 pl-2 text-center font-medium w-8">순위</th>
+                <th className="py-2 text-left font-medium">종목</th>
+                <th className="py-2 text-right font-medium pr-2">현재가</th>
+                <th className="py-2 text-right font-medium pr-2">등락률</th>
+                <th className="py-2 text-right font-medium pr-2 hidden lg:table-cell">거래량</th>
+                <th className="py-2 text-right font-medium pr-2 hidden xl:table-cell">시가총액</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-slate-100">
+            <tbody>
               {stocks.map((stock, i) => {
                 const isUp = stock.priceChange > 0
                 const isDown = stock.priceChange < 0
-                const changeColor = isUp ? 'text-red-500' : isDown ? 'text-blue-500' : 'text-slate-400'
+                const isSelected = selectedCode === stock.stockCode
                 return (
-                  <tr key={stock.stockCode} className="hover:bg-slate-50">
-                    <td className="py-2.5 text-slate-400">{i + 1}</td>
-                    <td className="py-2.5 font-mono text-slate-500">{stock.stockCode}</td>
-                    <td className="py-2.5 font-medium text-slate-800">{stock.stockName}</td>
-                    <td className="py-2.5">
-                      <span className={`rounded px-1.5 py-0.5 text-xs ${
-                        stock.market === 'KOSPI'
-                          ? 'bg-blue-50 text-blue-600'
-                          : 'bg-green-50 text-green-600'
-                      }`}>
-                        {stock.market}
-                      </span>
+                  <tr
+                    key={stock.stockCode}
+                    onClick={() => onSelect?.(stock.stockCode)}
+                    className={`border-b border-slate-50 cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-indigo-50 border-indigo-100'
+                        : 'hover:bg-slate-50'
+                    }`}
+                  >
+                    <td className="py-2 pl-2 text-center text-xs text-slate-400">{i + 1}</td>
+                    <td className="py-2">
+                      <div className="font-medium text-slate-800 leading-tight">{stock.stockName}</div>
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <span className="text-xs text-slate-400 font-mono">{stock.stockCode}</span>
+                        <span className={`text-xs px-1 rounded ${
+                          stock.market === 'KOSPI'
+                            ? 'text-blue-500'
+                            : 'text-green-600'
+                        }`}>{stock.market}</span>
+                      </div>
                     </td>
-                    <td className="py-2.5 text-right font-semibold text-slate-800">
-                      {formatKRW(stock.closePrice)}
+                    <td className={`py-2 pr-2 text-right font-semibold tabular-nums ${
+                      isUp ? 'text-red-500' : isDown ? 'text-blue-500' : 'text-slate-800'
+                    }`}>
+                      {Number(stock.closePrice).toLocaleString('ko-KR')}
                     </td>
-                    <td className={`py-2.5 text-right ${changeColor}`}>
-                      {isUp ? '+' : ''}{Number(stock.priceChange).toLocaleString()}
-                      <span className="ml-1 text-xs">
-                        ({isUp ? '+' : ''}{Number(stock.changeRate).toFixed(2)}%)
-                      </span>
+                    <td className={`py-2 pr-2 text-right text-xs tabular-nums ${
+                      isUp ? 'text-red-500' : isDown ? 'text-blue-500' : 'text-slate-400'
+                    }`}>
+                      <div>{isUp ? '+' : ''}{Number(stock.priceChange).toLocaleString()}</div>
+                      <div className="font-medium">
+                        {isUp ? '+' : ''}{Number(stock.changeRate).toFixed(2)}%
+                      </div>
                     </td>
-                    <td className="py-2.5 text-right text-slate-500">
+                    <td className="py-2 pr-2 text-right text-xs text-slate-500 tabular-nums hidden lg:table-cell">
                       {Number(stock.volume).toLocaleString()}
                     </td>
-                    <td className="py-2.5 text-right font-medium text-slate-700">
+                    <td className="py-2 pr-2 text-right text-xs text-slate-600 font-medium hidden xl:table-cell">
                       {formatMarketCap(stock.marketCap)}
                     </td>
                   </tr>

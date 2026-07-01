@@ -67,17 +67,11 @@ public class StockService {
 
     public StockHistoryResponse getHistory(String stockCode, int days) {
         List<KrxDailyPrice> history = krxService.getPriceHistory(stockCode, days);
-
-        if (history.isEmpty()) {
-            throw new CustomException(ErrorCode.STOCK_NOT_FOUND);
-        }
-
         List<StockHistoryResponse.HistoryItem> items = history.stream()
                 .map(p -> new StockHistoryResponse.HistoryItem(
                         p.getTradeDate().toString(),
                         BigDecimal.valueOf(p.getClosePrice())))
                 .toList();
-
         return new StockHistoryResponse(stockCode, items);
     }
 

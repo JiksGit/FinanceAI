@@ -29,28 +29,24 @@ function PortfolioRow({ fav }) {
   return (
     <div className="flex items-center justify-between py-2.5">
       <div>
-        <span className="text-sm font-medium text-slate-800">{fav.stockSymbol}</span>
-        <span className="ml-2 text-xs text-slate-400">{fav.stockName}</span>
+        <span className="text-sm font-medium text-slate-800">
+          {fav.stockName || fav.stockSymbol}
+        </span>
+        <span className="ml-2 text-xs text-slate-400 font-mono">{fav.stockSymbol}</span>
       </div>
       <div className="text-right">
         {fav.currentPrice != null && (
           <p className="text-sm font-semibold text-slate-800">
-            ${Number(fav.currentPrice).toFixed(2)}
+            ₩{Number(fav.currentPrice).toLocaleString('ko-KR')}
           </p>
         )}
         {hasHolding && fav.profitLoss != null && (
-          <p
-            className={`text-xs ${
-              isProfit ? 'text-red-500' : isLoss ? 'text-blue-500' : 'text-slate-400'
-            }`}
-          >
-            {isProfit ? '+' : ''}
-            {fav.profitLoss.toFixed(2)} ({fav.profitLossRate?.toFixed(2)}%)
+          <p className={`text-xs ${isProfit ? 'text-red-500' : isLoss ? 'text-blue-500' : 'text-slate-400'}`}>
+            {isProfit ? '+' : ''}₩{Number(fav.profitLoss).toLocaleString('ko-KR')}
+            {' '}({fav.profitLossRate >= 0 ? '+' : ''}{Number(fav.profitLossRate).toFixed(2)}%)
           </p>
         )}
-        {!hasHolding && (
-          <p className="text-xs text-slate-300">보유 없음</p>
-        )}
+        {!hasHolding && <p className="text-xs text-slate-300">보유 없음</p>}
       </div>
     </div>
   )
@@ -159,7 +155,9 @@ export default function HomePage() {
         <h1 className="text-xl font-semibold text-slate-900">
           {isAuthenticated ? `안녕하세요, ${nickname}님 👋` : '오늘의 금융 대시보드'}
         </h1>
-        <p className="mt-0.5 text-sm text-slate-400">{exchangeData?.baseDate ?? ''} 기준</p>
+        <p className="mt-0.5 text-sm text-slate-400">
+          {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '')} 기준
+        </p>
       </div>
 
       {/* 요약 카드 3개 */}

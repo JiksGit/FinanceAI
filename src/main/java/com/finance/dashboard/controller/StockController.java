@@ -10,6 +10,7 @@ import com.finance.dashboard.dto.response.StockResponse;
 import com.finance.dashboard.dto.response.StockSearchResult;
 import com.finance.dashboard.dto.response.TopStockResponse;
 import com.finance.dashboard.security.UserPrincipal;
+import com.finance.dashboard.service.KrxService;
 import com.finance.dashboard.service.StockService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,6 +26,7 @@ import java.util.List;
 public class StockController {
 
     private final StockService stockService;
+    private final KrxService krxService;
 
     @GetMapping("/search")
     public List<StockSearchResult> search(@RequestParam String keyword) {
@@ -85,6 +87,22 @@ public class StockController {
     @GetMapping("/{symbol}/news")
     public NewsResponse getNews(@PathVariable String symbol) {
         return stockService.getNews(symbol);
+    }
+
+    @GetMapping("/market/debug")
+    public String debugNaver(@RequestParam(defaultValue = "KOSPI") String market) {
+        String url = String.format("https://m.stock.naver.com/api/index/%s/stocks?pageSize=5&page=1&type=marketValue", market);
+        return krxService.getRawJson(url);
+    }
+
+    @GetMapping("/market/reload")
+    public String reloadMarket() {
+        try {
+            krxService.loadAllPrices(krxService.resolveLatestTradingDate());
+            return "reload triggered";
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
+        }
     }
 
     @GetMapping("/market/top")

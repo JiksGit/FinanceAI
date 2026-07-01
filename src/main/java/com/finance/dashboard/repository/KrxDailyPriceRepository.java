@@ -1,6 +1,7 @@
 package com.finance.dashboard.repository;
 
 import com.finance.dashboard.entity.KrxDailyPrice;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 
@@ -17,11 +18,9 @@ public interface KrxDailyPriceRepository extends JpaRepository<KrxDailyPrice, Lo
     List<KrxDailyPrice> findByStockCodeAndTradeDateBetweenOrderByTradeDateDesc(
             String stockCode, LocalDate from, LocalDate to);
 
-    @Query("SELECT p FROM KrxDailyPrice p WHERE p.tradeDate = :date ORDER BY p.marketCap DESC LIMIT :limit")
-    List<KrxDailyPrice> findTopByMarketCapOnDate(LocalDate date, int limit);
+    List<KrxDailyPrice> findByTradeDateOrderByMarketCapDesc(LocalDate date, Pageable pageable);
 
-    @Query("SELECT p FROM KrxDailyPrice p WHERE p.tradeDate = :date AND p.market = :market ORDER BY p.marketCap DESC LIMIT :limit")
-    List<KrxDailyPrice> findTopByMarketCapOnDateAndMarket(LocalDate date, String market, int limit);
+    List<KrxDailyPrice> findByTradeDateAndMarketOrderByMarketCapDesc(LocalDate date, String market, Pageable pageable);
 
     @Query("SELECT MAX(p.tradeDate) FROM KrxDailyPrice p")
     Optional<LocalDate> findLatestTradeDate();
