@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.LinkedMultiValueMap;
@@ -19,6 +20,7 @@ import org.springframework.web.client.RestClient;
 import java.math.BigDecimal;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
@@ -38,13 +40,17 @@ public class KrxService {
     private final KrxStockInfoRepository stockInfoRepository;
     private final KrxDailyPriceRepository dailyPriceRepository;
 
+    private static final String KRX_HOME = "http://data.krx.co.kr/contents/MDC/MAIN/main/MDCMAIN001.cmd";
+    private static final String USER_AGENT =
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36";
+
     private final RestClient restClient = RestClient.builder()
-            .defaultHeader(HttpHeaders.USER_AGENT,
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36")
+            .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
             .defaultHeader(HttpHeaders.REFERER, "http://data.krx.co.kr/")
-            .defaultHeader(HttpHeaders.CONTENT_TYPE,
-                    MediaType.APPLICATION_FORM_URLENCODED_VALUE + ";charset=UTF-8")
             .build();
+
+    private String sessionCookie = null;
+    private LocalDateTime sessionExpiry = LocalDateTime.MIN;
 
     // ── 최신 거래일 조회 ────────────────────────────────────────
 
@@ -255,10 +261,38 @@ public class KrxService {
         return dailyPriceRepository.findTopByMarketCapOnDateAndMarket(date, market, limit);
     }
 
+    // ── 세션 수립 ───────────────────────────────────────────────
+
+    private synchronized void ensureSession() {
+        if (sessionCookie != null && LocalDateTime.now().isBefore(sessionExpiry)) return;
+
+        try {
+            ResponseEntity<Void> resp = restClient.get()
+                    .uri(KRX_HOME)
+                    .retrieve()
+                    .toBodilessEntity();
+
+            List<String> cookies = resp.getHeaders().get(HttpHeaders.SET_COOKIE);
+            if (cookies != null) {
+                sessionCookie = cookies.stream()
+                        .filter(c -> c.startsWith("JSESSIONID"))
+                        .findFirst()
+                        .map(c -> c.split(";")[0])
+                        .orElse(null);
+            }
+            sessionExpiry = LocalDateTime.now().plusMinutes(25);
+            log.info("KRX 세션 수립 완료: {}", sessionCookie);
+        } catch (Exception e) {
+            log.warn("KRX 세션 수립 실패: {}", e.getMessage());
+        }
+    }
+
     // ── KRX HTTP 호출 ───────────────────────────────────────────
 
     private JsonNode callKrx(String bld, String mktId, LocalDate trdDd,
                               String isinCd, String dateRange) {
+        ensureSession();
+
         MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
         form.add("bld", bld);
         form.add("locale", "ko_KR");
@@ -276,12 +310,15 @@ public class KrxService {
 
         log.debug("KRX 호출: bld={}, mktId={}, date={}", bld, mktId, trdDd);
 
-        return restClient.post()
+        var request = restClient.post()
                 .uri(krxConfig.baseUrl())
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(form)
-                .retrieve()
-                .body(JsonNode.class);
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED);
+
+        if (sessionCookie != null) {
+            request = request.header(HttpHeaders.COOKIE, sessionCookie);
+        }
+
+        return request.body(form).retrieve().body(JsonNode.class);
     }
 
     // ── 파싱 유틸 ───────────────────────────────────────────────
