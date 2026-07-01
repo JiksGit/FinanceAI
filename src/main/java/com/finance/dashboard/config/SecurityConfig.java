@@ -35,7 +35,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/exchange/**").permitAll()
                         .requestMatchers("/api/internal/**").authenticated()
                         .requestMatchers("/api/stock/favorites", "/api/stock/favorites/**").authenticated()
-                        .requestMatchers("/api/stock/search", "/api/stock/{symbol}", "/api/stock/{symbol}/history").permitAll()
+                        .requestMatchers("/api/stock/search", "/api/stock/market/**",
+                                "/api/stock/{symbol}", "/api/stock/{symbol}/history",
+                                "/api/stock/{symbol}/news").permitAll()
                         .requestMatchers("/api/signals/my", "/api/signals/generate").authenticated()
                         .requestMatchers("/api/signals").permitAll()
                         .anyRequest().authenticated()

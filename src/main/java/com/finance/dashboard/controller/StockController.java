@@ -8,6 +8,7 @@ import com.finance.dashboard.dto.response.PortfolioSummaryResponse;
 import com.finance.dashboard.dto.response.StockHistoryResponse;
 import com.finance.dashboard.dto.response.StockResponse;
 import com.finance.dashboard.dto.response.StockSearchResult;
+import com.finance.dashboard.dto.response.TopStockResponse;
 import com.finance.dashboard.security.UserPrincipal;
 import com.finance.dashboard.service.StockService;
 import jakarta.validation.Valid;
@@ -84,5 +85,13 @@ public class StockController {
     @GetMapping("/{symbol}/news")
     public NewsResponse getNews(@PathVariable String symbol) {
         return stockService.getNews(symbol);
+    }
+
+    @GetMapping("/market/top")
+    public List<TopStockResponse> getTopStocks(
+            @RequestParam(defaultValue = "") String market,
+            @RequestParam(defaultValue = "50") int limit
+    ) {
+        return stockService.getTopByMarketCap(market, Math.min(limit, 100));
     }
 }

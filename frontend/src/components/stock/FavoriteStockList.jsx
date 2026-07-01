@@ -95,12 +95,12 @@ export default function FavoriteStockList({ favorites, onSelect, onRemove, onUpd
             {hasHolding && (
               <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
                 <span>
-                  {fav.quantity}주 · 평단 ${Number(fav.avgPrice).toFixed(2)}
+                  {fav.quantity}주 · 평단 ₩{Number(fav.avgPrice).toLocaleString('ko-KR')}
                 </span>
                 {fav.currentPrice != null && (
-                  <span className={isProfit ? 'text-red-600' : isLoss ? 'text-blue-600' : 'text-slate-400'}>
+                  <span className={isProfit ? 'text-red-500' : isLoss ? 'text-blue-500' : 'text-slate-400'}>
                     {isProfit ? '+' : ''}
-                    {fav.profitLoss?.toFixed(2)} ({fav.profitLossRate?.toFixed(2)}%)
+                    {Number(fav.profitLoss).toLocaleString()}원 ({fav.profitLossRate?.toFixed(2)}%)
                   </span>
                 )}
               </div>

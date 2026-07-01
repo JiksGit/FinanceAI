@@ -132,12 +132,25 @@ export default function StockPage() {
                 {favorites.some((f) => f.stockSymbol === selected.symbol) ? '즐겨찾기 해제' : '즐겨찾기 추가'}
               </button>
             </div>
+            <p className="mb-1 text-sm text-slate-500">
+              {selected.market && (
+                <span className={`mr-2 rounded px-1.5 py-0.5 text-xs ${
+                  selected.market === 'KOSPI' ? 'bg-blue-50 text-blue-600' : 'bg-green-50 text-green-600'
+                }`}>{selected.market}</span>
+              )}
+              {selected.sector && <span className="text-xs text-slate-400">{selected.sector}</span>}
+            </p>
             <p className="mb-3 text-sm text-slate-500">
-              ${selected.price?.toFixed(2)}{' '}
-              <span className={selected.change > 0 ? 'text-red-600' : selected.change < 0 ? 'text-blue-600' : ''}>
+              ₩{Number(selected.price).toLocaleString('ko-KR')}{' '}
+              <span className={selected.change > 0 ? 'text-red-500' : selected.change < 0 ? 'text-blue-500' : ''}>
                 {selected.change > 0 ? '+' : ''}
-                {selected.change?.toFixed(2)} ({selected.changeRate?.toFixed(2)}%)
+                {Number(selected.change).toLocaleString()} ({Number(selected.changeRate).toFixed(2)}%)
               </span>
+              {selected.marketCap && (
+                <span className="ml-3 text-xs text-slate-400">
+                  시총 {(selected.marketCap / 1_000_000_000_000).toFixed(1)}조
+                </span>
+              )}
             </p>
             <StockChart history={history} />
           </div>

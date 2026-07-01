@@ -8,7 +8,7 @@ function CustomTooltip({ active, payload }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs shadow">
       <p className="font-semibold text-slate-800">{d.symbol}</p>
-      <p className="text-slate-500">${Number(d.currentValue).toFixed(2)}</p>
+      <p className="text-slate-500">₩{Number(d.currentValue).toLocaleString('ko-KR')}</p>
       <p className="text-indigo-500">{d.weightPercent.toFixed(1)}%</p>
     </div>
   )
@@ -42,19 +42,19 @@ export default function PortfolioPieChart({ summary }) {
         <div className="rounded-lg bg-slate-50 px-3 py-2.5">
           <p className="text-xs text-slate-400">총 투자금</p>
           <p className="mt-0.5 text-sm font-semibold text-slate-800">
-            ${Number(summary.totalInvested).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ₩{Number(summary.totalInvested).toLocaleString('ko-KR')}
           </p>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-2.5">
           <p className="text-xs text-slate-400">총 평가금액</p>
           <p className="mt-0.5 text-sm font-semibold text-slate-800">
-            ${Number(summary.totalCurrentValue).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ₩{Number(summary.totalCurrentValue).toLocaleString('ko-KR')}
           </p>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-2.5">
           <p className="text-xs text-slate-400">총 손익</p>
           <p className={`mt-0.5 text-sm font-semibold ${isProfit ? 'text-red-500' : isLoss ? 'text-blue-500' : 'text-slate-800'}`}>
-            {isProfit ? '+' : ''}${Number(summary.totalProfitLoss).toFixed(2)}
+            {isProfit ? '+' : ''}₩{Number(summary.totalProfitLoss).toLocaleString('ko-KR')}
           </p>
         </div>
         <div className="rounded-lg bg-slate-50 px-3 py-2.5">

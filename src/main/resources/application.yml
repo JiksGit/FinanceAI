@@ -34,3 +34,6 @@ openai:
 
 service:
   token: ${SERVICE_TOKEN:}
+
+krx:
+  base-url: http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd

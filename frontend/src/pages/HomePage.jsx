@@ -5,6 +5,7 @@ import { getFavorites } from '../api/stockApi'
 import { getRecentSignals } from '../api/signalApi'
 import { useAuth } from '../hooks/useAuth'
 import ExchangeRateChart from '../components/exchange/ExchangeRateChart'
+import MarketTopTable from '../components/stock/MarketTopTable'
 import { getRateHistory } from '../api/exchangeApi'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 
@@ -274,6 +275,17 @@ export default function HomePage() {
             </div>
           )}
         </div>
+      </div>
+
+      {/* 시가총액 TOP 50 */}
+      <div className="rounded-xl border border-slate-200 bg-white p-5">
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-slate-700">시가총액 TOP 50</h2>
+          <Link to="/stocks" className="text-xs text-indigo-500 hover:underline">
+            종목 검색 →
+          </Link>
+        </div>
+        <MarketTopTable limit={50} />
       </div>
 
       {/* 하단: 환율 */}

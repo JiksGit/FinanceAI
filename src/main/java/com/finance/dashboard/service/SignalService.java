@@ -31,8 +31,19 @@ public class SignalService {
     private static final String INDICATOR = "SMA5_SMA20_CROSS";
     private static final int SHORT_PERIOD = 5;
     private static final int LONG_PERIOD = 20;
-    /** 즐겨찾기한 사용자가 아직 없을 때 사용할 기본 관찰 목록. */
-    private static final List<String> DEFAULT_WATCHLIST = List.of("AAPL", "TSLA", "MSFT", "GOOGL", "AMZN", "NVDA");
+    /** 즐겨찾기한 사용자가 아직 없을 때 사용할 기본 관찰 목록 (KOSPI 시총 상위). */
+    private static final List<String> DEFAULT_WATCHLIST = List.of(
+            "005930", // 삼성전자
+            "000660", // SK하이닉스
+            "005380", // 현대차
+            "035420", // NAVER
+            "005490", // POSCO홀딩스
+            "035720", // 카카오
+            "051910", // LG화학
+            "006400", // 삼성SDI
+            "028260", // 삼성물산
+            "207940"  // 삼성바이오로직스
+    );
 
     private final StockService stockService;
     private final StockSignalRepository stockSignalRepository;

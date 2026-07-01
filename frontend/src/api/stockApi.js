@@ -23,3 +23,6 @@ export const getPortfolioSummary = () =>
 
 export const getStockNews = (symbol) =>
   api.get(`/stock/${symbol}/news`).then((res) => res.data)
+
+export const getTopStocks = (market = '', limit = 50) =>
+  api.get('/stock/market/top', { params: { market, limit } }).then((res) => res.data)
