@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import {
   addFavorite,
   getFavorites,
+  getPortfolioSummary,
   getStock,
   getStockHistory,
   removeFavorite,
@@ -12,6 +13,7 @@ import { useAuth } from '../hooks/useAuth'
 import StockSearchBar from '../components/stock/StockSearchBar'
 import StockChart from '../components/stock/StockChart'
 import FavoriteStockList from '../components/stock/FavoriteStockList'
+import PortfolioPieChart from '../components/stock/PortfolioPieChart'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import ErrorMessage from '../components/common/ErrorMessage'
 
@@ -33,12 +35,14 @@ export default function StockPage() {
   const [selected, setSelected] = useState(null)
   const [history, setHistory] = useState([])
   const [favorites, setFavorites] = useState([])
+  const [portfolioSummary, setPortfolioSummary] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
   const loadFavorites = () => {
     if (!isAuthenticated) return
     getFavorites().then(setFavorites).catch(() => {})
+    getPortfolioSummary().then(setPortfolioSummary).catch(() => {})
   }
 
   useEffect(loadFavorites, [isAuthenticated])
@@ -131,14 +135,22 @@ export default function StockPage() {
         )}
       </div>
 
-      <div>
-        <h2 className="mb-3 text-lg font-semibold text-slate-900">포트폴리오</h2>
-        <FavoriteStockList
-          favorites={favorites}
-          onSelect={handleSelect}
-          onRemove={handleToggleFavorite}
-          onUpdateHolding={handleUpdateHolding}
-        />
+      <div className="space-y-6">
+        <div>
+          <h2 className="mb-3 text-lg font-semibold text-slate-900">포트폴리오</h2>
+          <FavoriteStockList
+            favorites={favorites}
+            onSelect={handleSelect}
+            onRemove={handleToggleFavorite}
+            onUpdateHolding={handleUpdateHolding}
+          />
+        </div>
+        {isAuthenticated && (
+          <div>
+            <h2 className="mb-3 text-lg font-semibold text-slate-900">종목 비중</h2>
+            <PortfolioPieChart summary={portfolioSummary} />
+          </div>
+        )}
       </div>
     </div>
   )

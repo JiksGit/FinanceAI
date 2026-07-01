@@ -3,6 +3,7 @@ package com.finance.dashboard.controller;
 import com.finance.dashboard.dto.request.FavoriteStockRequest;
 import com.finance.dashboard.dto.request.UpdateHoldingRequest;
 import com.finance.dashboard.dto.response.FavoriteStockResponse;
+import com.finance.dashboard.dto.response.PortfolioSummaryResponse;
 import com.finance.dashboard.dto.response.StockHistoryResponse;
 import com.finance.dashboard.dto.response.StockResponse;
 import com.finance.dashboard.dto.response.StockSearchResult;
@@ -31,6 +32,11 @@ public class StockController {
     @GetMapping("/favorites")
     public List<FavoriteStockResponse> getFavorites(@AuthenticationPrincipal UserPrincipal principal) {
         return stockService.getFavorites(principal.getUserId());
+    }
+
+    @GetMapping("/portfolio/summary")
+    public PortfolioSummaryResponse getPortfolioSummary(@AuthenticationPrincipal UserPrincipal principal) {
+        return stockService.getPortfolioSummary(principal.getUserId());
     }
 
     @PostMapping("/favorites")

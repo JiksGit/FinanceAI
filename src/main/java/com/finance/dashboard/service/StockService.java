@@ -233,6 +233,53 @@ public class StockService {
         );
     }
 
+    public PortfolioSummaryResponse getPortfolioSummary(Long userId) {
+        List<FavoriteStockResponse> favorites = getFavorites(userId);
+
+        List<FavoriteStockResponse> withHolding = favorites.stream()
+                .filter(f -> f.quantity() != null && f.quantity() > 0
+                        && f.avgPrice() != null && f.currentPrice() != null)
+                .toList();
+
+        BigDecimal totalInvested = withHolding.stream()
+                .map(f -> f.avgPrice().multiply(BigDecimal.valueOf(f.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalCurrentValue = withHolding.stream()
+                .map(f -> f.currentPrice().multiply(BigDecimal.valueOf(f.quantity())))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        BigDecimal totalProfitLoss = totalCurrentValue.subtract(totalInvested).setScale(2, RoundingMode.HALF_UP);
+
+        BigDecimal totalProfitLossRate = totalInvested.compareTo(BigDecimal.ZERO) != 0
+                ? totalProfitLoss.divide(totalInvested, 6, RoundingMode.HALF_UP)
+                        .multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP)
+                : BigDecimal.ZERO;
+
+        List<PortfolioSummaryResponse.HoldingWeight> weights = withHolding.stream()
+                .map(f -> {
+                    BigDecimal value = f.currentPrice().multiply(BigDecimal.valueOf(f.quantity()));
+                    double pct = totalCurrentValue.compareTo(BigDecimal.ZERO) != 0
+                            ? value.divide(totalCurrentValue, 6, RoundingMode.HALF_UP)
+                                    .multiply(BigDecimal.valueOf(100))
+                                    .setScale(2, RoundingMode.HALF_UP)
+                                    .doubleValue()
+                            : 0.0;
+                    return new PortfolioSummaryResponse.HoldingWeight(
+                            f.stockSymbol(), f.stockName(), value.setScale(2, RoundingMode.HALF_UP), pct);
+                })
+                .toList();
+
+        return new PortfolioSummaryResponse(
+                totalInvested.setScale(2, RoundingMode.HALF_UP),
+                totalCurrentValue.setScale(2, RoundingMode.HALF_UP),
+                totalProfitLoss,
+                totalProfitLossRate,
+                withHolding.size(),
+                weights
+        );
+    }
+
     @Transactional
     public void updateHolding(Long userId, String symbol, UpdateHoldingRequest request) {
         FavoriteStock favorite = favoriteStockRepository.findByUserIdAndStockSymbol(userId, symbol.toUpperCase())
