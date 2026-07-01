@@ -20,3 +20,6 @@ export const updateHolding = (symbol, quantity, avgPrice) =>
 
 export const getPortfolioSummary = () =>
   api.get('/stock/portfolio/summary').then((res) => res.data)
+
+export const getStockNews = (symbol) =>
+  api.get(`/stock/${symbol}/news`).then((res) => res.data)

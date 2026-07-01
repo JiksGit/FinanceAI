@@ -7,6 +7,9 @@ import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
 import java.util.Date;
 
 @Component
@@ -61,5 +64,10 @@ public class JwtTokenProvider {
 
     public boolean isRefreshToken(Claims claims) {
         return TOKEN_TYPE_REFRESH.equals(claims.get(CLAIM_TOKEN_TYPE, String.class));
+    }
+
+    public LocalDateTime getExpiration(Claims claims) {
+        Instant instant = claims.getExpiration().toInstant();
+        return LocalDateTime.ofInstant(instant, ZoneId.systemDefault());
     }
 }

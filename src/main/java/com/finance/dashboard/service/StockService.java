@@ -5,6 +5,7 @@ import com.finance.dashboard.config.AlphaVantageConfig;
 import com.finance.dashboard.dto.request.FavoriteStockRequest;
 import com.finance.dashboard.dto.request.UpdateHoldingRequest;
 import com.finance.dashboard.dto.response.*;
+import com.finance.dashboard.dto.response.NewsResponse;
 import com.finance.dashboard.entity.FavoriteStock;
 import com.finance.dashboard.exception.CustomException;
 import com.finance.dashboard.exception.ErrorCode;
@@ -231,6 +232,78 @@ public class StockService {
                 profitLossRate,
                 fav.getCreatedAt()
         );
+    }
+
+    public NewsResponse getNews(String symbol) {
+        if (alphaVantageConfig.mockEnabled()) {
+            return getMockNews(symbol.toUpperCase());
+        }
+
+        try {
+            JsonNode root = restClient.get()
+                    .uri(alphaVantageConfig.baseUrl()
+                            + "?function=NEWS_SENTIMENT&tickers={symbol}&limit=5&apikey={key}",
+                            symbol, alphaVantageConfig.apiKey())
+                    .retrieve()
+                    .body(JsonNode.class);
+
+            List<NewsResponse.NewsItem> items = new ArrayList<>();
+            if (root != null && root.has("feed")) {
+                for (JsonNode article : root.get("feed")) {
+                    String sentiment = "Neutral";
+                    JsonNode tickerSentiments = article.path("ticker_sentiment");
+                    for (JsonNode ts : tickerSentiments) {
+                        if (symbol.equalsIgnoreCase(ts.path("ticker").asText())) {
+                            sentiment = ts.path("ticker_sentiment_label").asText("Neutral");
+                            break;
+                        }
+                    }
+                    items.add(new NewsResponse.NewsItem(
+                            article.path("title").asText(),
+                            article.path("url").asText(),
+                            article.path("summary").asText(),
+                            sentiment,
+                            article.path("time_published").asText(),
+                            article.path("source").asText()
+                    ));
+                    if (items.size() >= 5) break;
+                }
+            }
+            return new NewsResponse(symbol.toUpperCase(), items);
+        } catch (RestClientException e) {
+            log.warn("Alpha Vantage 뉴스 조회 실패: {}", symbol);
+            return getMockNews(symbol.toUpperCase());
+        }
+    }
+
+    private NewsResponse getMockNews(String symbol) {
+        List<NewsResponse.NewsItem> items = List.of(
+                new NewsResponse.NewsItem(
+                        symbol + " posts strong quarterly earnings beat",
+                        "https://example.com/news/1",
+                        symbol + " reported earnings per share above analyst expectations, driven by robust demand.",
+                        "Bullish",
+                        LocalDate.now().toString(),
+                        "MarketWatch"
+                ),
+                new NewsResponse.NewsItem(
+                        "Analysts raise price target for " + symbol,
+                        "https://example.com/news/2",
+                        "Several Wall Street analysts upgraded their outlook following recent product announcements.",
+                        "Bullish",
+                        LocalDate.now().minusDays(1).toString(),
+                        "Bloomberg"
+                ),
+                new NewsResponse.NewsItem(
+                        symbol + " faces macro headwinds amid rate uncertainty",
+                        "https://example.com/news/3",
+                        "Rising interest rates continue to weigh on growth stock valuations including " + symbol + ".",
+                        "Bearish",
+                        LocalDate.now().minusDays(2).toString(),
+                        "Reuters"
+                )
+        );
+        return new NewsResponse(symbol, items);
     }
 
     public PortfolioSummaryResponse getPortfolioSummary(Long userId) {

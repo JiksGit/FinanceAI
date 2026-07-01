@@ -5,6 +5,7 @@ import {
   getPortfolioSummary,
   getStock,
   getStockHistory,
+  getStockNews,
   removeFavorite,
   searchStock,
   updateHolding,
@@ -14,6 +15,7 @@ import StockSearchBar from '../components/stock/StockSearchBar'
 import StockChart from '../components/stock/StockChart'
 import FavoriteStockList from '../components/stock/FavoriteStockList'
 import PortfolioPieChart from '../components/stock/PortfolioPieChart'
+import NewsCard from '../components/stock/NewsCard'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 import ErrorMessage from '../components/common/ErrorMessage'
 
@@ -36,6 +38,7 @@ export default function StockPage() {
   const [history, setHistory] = useState([])
   const [favorites, setFavorites] = useState([])
   const [portfolioSummary, setPortfolioSummary] = useState(null)
+  const [news, setNews] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
 
@@ -60,10 +63,16 @@ export default function StockPage() {
   const handleSelect = async (symbol) => {
     setError(null)
     setLoading(true)
+    setNews([])
     try {
-      const [stock, hist] = await Promise.all([getStock(symbol), getStockHistory(symbol, 30)])
+      const [stock, hist, newsData] = await Promise.all([
+        getStock(symbol),
+        getStockHistory(symbol, 30),
+        getStockNews(symbol),
+      ])
       setSelected(stock)
       setHistory(hist.history)
+      setNews(newsData.news ?? [])
     } catch {
       setError('종목 정보를 불러오지 못했습니다.')
     } finally {
@@ -131,6 +140,17 @@ export default function StockPage() {
               </span>
             </p>
             <StockChart history={history} />
+          </div>
+        )}
+
+        {news.length > 0 && !loading && (
+          <div>
+            <h2 className="mb-3 text-lg font-semibold text-slate-900">관련 뉴스</h2>
+            <div className="space-y-2">
+              {news.map((item, i) => (
+                <NewsCard key={i} item={item} />
+              ))}
+            </div>
           </div>
         )}
       </div>

@@ -3,6 +3,7 @@ package com.finance.dashboard.controller;
 import com.finance.dashboard.dto.request.FavoriteStockRequest;
 import com.finance.dashboard.dto.request.UpdateHoldingRequest;
 import com.finance.dashboard.dto.response.FavoriteStockResponse;
+import com.finance.dashboard.dto.response.NewsResponse;
 import com.finance.dashboard.dto.response.PortfolioSummaryResponse;
 import com.finance.dashboard.dto.response.StockHistoryResponse;
 import com.finance.dashboard.dto.response.StockResponse;
@@ -78,5 +79,10 @@ public class StockController {
             @RequestParam(defaultValue = "30") int days
     ) {
         return stockService.getHistory(symbol, days);
+    }
+
+    @GetMapping("/{symbol}/news")
+    public NewsResponse getNews(@PathVariable String symbol) {
+        return stockService.getNews(symbol);
     }
 }
