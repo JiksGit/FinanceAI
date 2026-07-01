@@ -1,6 +1,8 @@
+import { useEffect, useState } from 'react'
 import { Route, Routes } from 'react-router-dom'
 import Navbar from './components/common/Navbar'
 import ProtectedRoute from './components/common/ProtectedRoute'
+import SessionExpiredModal from './components/common/SessionExpiredModal'
 import HomePage from './pages/HomePage'
 import StockPage from './pages/StockPage'
 import SignalsPage from './pages/SignalsPage'
@@ -8,6 +10,14 @@ import AiPage from './pages/AiPage'
 import LoginPage from './pages/LoginPage'
 
 function App() {
+  const [sessionExpired, setSessionExpired] = useState(false)
+
+  useEffect(() => {
+    const handler = () => setSessionExpired(true)
+    window.addEventListener('session-expired', handler)
+    return () => window.removeEventListener('session-expired', handler)
+  }, [])
+
   return (
     <div className="min-h-screen bg-slate-50">
       <Navbar />
@@ -27,6 +37,10 @@ function App() {
           />
         </Routes>
       </main>
+
+      {sessionExpired && (
+        <SessionExpiredModal onClose={() => setSessionExpired(false)} />
+      )}
     </div>
   )
 }

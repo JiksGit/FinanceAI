@@ -43,6 +43,7 @@ api.interceptors.response.use(
         return api(config)
       } catch (refreshError) {
         logout()
+        window.dispatchEvent(new Event('session-expired'))
         return Promise.reject(refreshError)
       }
     }
