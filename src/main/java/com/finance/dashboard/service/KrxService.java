@@ -49,31 +49,27 @@ public class KrxService {
     // ── 최신 거래일 조회 ────────────────────────────────────────
 
     public LocalDate resolveLatestTradingDate() {
-        // DB에 있으면 바로 반환
+        // DB에 데이터가 있고 7일 이내면 바로 반환
         Optional<LocalDate> cached = dailyPriceRepository.findLatestTradeDate();
         if (cached.isPresent() && !cached.get().isBefore(LocalDate.now().minusDays(7))) {
             return cached.get();
         }
-        // 없으면 오늘부터 최대 7일 앞으로 탐색
-        LocalDate cursor = LocalDate.now();
-        for (int i = 0; i < 7; i++) {
+
+        // KST 15:30 이전이면 오늘 데이터가 아직 없으므로 어제부터 탐색
+        java.time.LocalTime nowKst = java.time.LocalTime.now(java.time.ZoneId.of("Asia/Seoul"));
+        LocalDate start = (nowKst.isBefore(java.time.LocalTime.of(15, 30)))
+                ? LocalDate.now().minusDays(1)
+                : LocalDate.now();
+
+        LocalDate cursor = start;
+        for (int i = 0; i < 10; i++) {
             if (cursor.getDayOfWeek() != DayOfWeek.SATURDAY
                     && cursor.getDayOfWeek() != DayOfWeek.SUNDAY) {
-                if (existsOnKrx(cursor)) return cursor;
+                return cursor; // 주말이 아니면 해당 날짜를 거래일로 사용
             }
             cursor = cursor.minusDays(1);
         }
         return cursor;
-    }
-
-    private boolean existsOnKrx(LocalDate date) {
-        try {
-            JsonNode root = callKrx(BLD_STOCK_LIST, "STK", date, null, null);
-            JsonNode output = root != null ? root.get("output") : null;
-            return output != null && output.isArray() && !output.isEmpty();
-        } catch (Exception e) {
-            return false;
-        }
     }
 
     // ── 전종목 시세 로드 (KOSPI + KOSDAQ) ──────────────────────
@@ -93,8 +89,12 @@ public class KrxService {
     private void loadMarket(String mktId, String marketName, LocalDate date) {
         try {
             JsonNode root = callKrx(BLD_STOCK_LIST, mktId, date, null, null);
+            log.info("KRX {} API 응답: {}", marketName, root != null ? root.toString().substring(0, Math.min(200, root.toString().length())) : "null");
             JsonNode output = root != null ? root.get("output") : null;
-            if (output == null || !output.isArray()) return;
+            if (output == null || !output.isArray() || output.isEmpty()) {
+                log.warn("KRX {} 데이터 없음 (date={}). output={}", marketName, date, output);
+                return;
+            }
 
             List<KrxDailyPrice> prices = new ArrayList<>();
             for (JsonNode row : output) {
@@ -263,6 +263,7 @@ public class KrxService {
         form.add("bld", bld);
         form.add("locale", "ko_KR");
         form.add("csvxls_isNo", "false");
+        form.add("money", "1");
 
         if (mktId != null) form.add("mktId", mktId);
         if (trdDd != null) form.add("trdDd", trdDd.format(KRX_DATE_FMT));
@@ -273,8 +274,11 @@ public class KrxService {
             form.add("endDd", parts[1]);
         }
 
+        log.debug("KRX 호출: bld={}, mktId={}, date={}", bld, mktId, trdDd);
+
         return restClient.post()
                 .uri(krxConfig.baseUrl())
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(form)
                 .retrieve()
                 .body(JsonNode.class);
