@@ -1,6 +1,7 @@
 package com.finance.dashboard.service;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finance.dashboard.config.KrxConfig;
 import com.finance.dashboard.entity.KrxDailyPrice;
 import com.finance.dashboard.entity.KrxStockInfo;
@@ -8,22 +9,28 @@ import com.finance.dashboard.repository.KrxDailyPriceRepository;
 import com.finance.dashboard.repository.KrxStockInfoRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
-import org.springframework.web.client.RestClient;
 
 import java.math.BigDecimal;
+import java.net.CookieManager;
+import java.net.CookiePolicy;
+import java.net.URI;
+import java.net.URLEncoder;
+import java.net.http.HttpClient;
+import java.net.http.HttpRequest;
+import java.net.http.HttpResponse;
+import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
+import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -40,16 +47,19 @@ public class KrxService {
     private final KrxStockInfoRepository stockInfoRepository;
     private final KrxDailyPriceRepository dailyPriceRepository;
 
-    private static final String KRX_HOME = "http://data.krx.co.kr/contents/MDC/MAIN/main/MDCMAIN001.cmd";
-    private static final String USER_AGENT =
+    private static final String KRX_HOME    = "http://data.krx.co.kr/";
+    private static final String KRX_API_URL = "http://data.krx.co.kr/comm/bldAttendant/getJsonData.cmd";
+    private static final String USER_AGENT  =
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/124.0 Safari/537.36";
 
-    private final RestClient restClient = RestClient.builder()
-            .defaultHeader(HttpHeaders.USER_AGENT, USER_AGENT)
-            .defaultHeader(HttpHeaders.REFERER, "http://data.krx.co.kr/")
+    private final ObjectMapper objectMapper = new ObjectMapper();
+
+    // 쿠키 자동 관리 HttpClient — 세션 쿠키(JSESSIONID)를 자동으로 유지
+    private final HttpClient httpClient = HttpClient.newBuilder()
+            .cookieHandler(new CookieManager(null, CookiePolicy.ACCEPT_ALL))
+            .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
 
-    private String sessionCookie = null;
     private LocalDateTime sessionExpiry = LocalDateTime.MIN;
 
     // ── 최신 거래일 조회 ────────────────────────────────────────
@@ -261,27 +271,19 @@ public class KrxService {
         return dailyPriceRepository.findTopByMarketCapOnDateAndMarket(date, market, limit);
     }
 
-    // ── 세션 수립 ───────────────────────────────────────────────
+    // ── 세션 수립 (JSESSIONID 쿠키 자동 획득) ──────────────────
 
     private synchronized void ensureSession() {
-        if (sessionCookie != null && LocalDateTime.now().isBefore(sessionExpiry)) return;
-
+        if (LocalDateTime.now().isBefore(sessionExpiry)) return;
         try {
-            ResponseEntity<Void> resp = restClient.get()
-                    .uri(KRX_HOME)
-                    .retrieve()
-                    .toBodilessEntity();
-
-            List<String> cookies = resp.getHeaders().get(HttpHeaders.SET_COOKIE);
-            if (cookies != null) {
-                sessionCookie = cookies.stream()
-                        .filter(c -> c.startsWith("JSESSIONID"))
-                        .findFirst()
-                        .map(c -> c.split(";")[0])
-                        .orElse(null);
-            }
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(KRX_HOME))
+                    .header("User-Agent", USER_AGENT)
+                    .GET()
+                    .build();
+            httpClient.send(req, HttpResponse.BodyHandlers.discarding());
             sessionExpiry = LocalDateTime.now().plusMinutes(25);
-            log.info("KRX 세션 수립 완료: {}", sessionCookie);
+            log.info("KRX 세션 수립 완료");
         } catch (Exception e) {
             log.warn("KRX 세션 수립 실패: {}", e.getMessage());
         }
@@ -293,32 +295,47 @@ public class KrxService {
                               String isinCd, String dateRange) {
         ensureSession();
 
-        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("bld", bld);
-        form.add("locale", "ko_KR");
-        form.add("csvxls_isNo", "false");
-        form.add("money", "1");
+        Map<String, String> params = new LinkedHashMap<>();
+        params.put("bld", bld);
+        params.put("locale", "ko_KR");
+        params.put("csvxls_isNo", "false");
+        params.put("money", "1");
 
-        if (mktId != null) form.add("mktId", mktId);
-        if (trdDd != null) form.add("trdDd", trdDd.format(KRX_DATE_FMT));
-        if (isinCd != null) form.add("isuCd", isinCd);
+        if (mktId != null) params.put("mktId", mktId);
+        if (trdDd != null) params.put("trdDd", trdDd.format(KRX_DATE_FMT));
+        if (isinCd != null) params.put("isuCd", isinCd);
         if (dateRange != null) {
             String[] parts = dateRange.split("\\|");
-            form.add("strtDd", parts[0]);
-            form.add("endDd", parts[1]);
+            params.put("strtDd", parts[0]);
+            params.put("endDd", parts[1]);
         }
+
+        String formBody = params.entrySet().stream()
+                .map(e -> URLEncoder.encode(e.getKey(), StandardCharsets.UTF_8)
+                        + "=" + URLEncoder.encode(e.getValue(), StandardCharsets.UTF_8))
+                .reduce((a, b) -> a + "&" + b)
+                .orElse("");
 
         log.debug("KRX 호출: bld={}, mktId={}, date={}", bld, mktId, trdDd);
 
-        var request = restClient.post()
-                .uri(krxConfig.baseUrl())
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED);
+        try {
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(KRX_API_URL))
+                    .header("User-Agent", USER_AGENT)
+                    .header("Referer", "http://data.krx.co.kr/")
+                    .header("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+                    .POST(HttpRequest.BodyPublishers.ofString(formBody, StandardCharsets.UTF_8))
+                    .build();
 
-        if (sessionCookie != null) {
-            request = request.header(HttpHeaders.COOKIE, sessionCookie);
+            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            log.debug("KRX 응답 상태: {}, 본문 앞부분: {}",
+                    resp.statusCode(),
+                    resp.body().substring(0, Math.min(150, resp.body().length())));
+            return objectMapper.readTree(resp.body());
+        } catch (Exception e) {
+            log.error("KRX API 호출 실패: {}", e.getMessage());
+            return null;
         }
-
-        return request.body(form).retrieve().body(JsonNode.class);
     }
 
     // ── 파싱 유틸 ───────────────────────────────────────────────
