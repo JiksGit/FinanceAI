@@ -37,11 +37,31 @@ export default function MarketTopTable({ limit = 50, onSelect, selectedCode, lin
   const { prices: livePrices, connected } = useMarketPrices()
 
   useEffect(() => {
-    setLoading(true)
-    getTopStocks(market, limit)
-      .then(setStocks)
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    let cancelled = false
+    let retryTimer = null
+
+    const fetchStocks = () => {
+      setLoading(true)
+      getTopStocks(market, limit)
+        .then((data) => {
+          if (cancelled) return
+          setStocks(data)
+          setLoading(false)
+          // 서버가 아직 캐시 로딩 중이면 5초 후 재시도
+          if (data.length === 0) {
+            retryTimer = setTimeout(fetchStocks, 5000)
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }
+
+    fetchStocks()
+    return () => {
+      cancelled = true
+      if (retryTimer) clearTimeout(retryTimer)
+    }
   }, [market, limit])
 
   return (
@@ -71,7 +91,15 @@ export default function MarketTopTable({ limit = 50, onSelect, selectedCode, lin
       </div>
 
       {loading ? (
-        <LoadingSpinner />
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
+          <LoadingSpinner />
+          <p className="text-sm">시세 데이터 로딩 중...</p>
+        </div>
+      ) : stocks.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 gap-3 text-slate-400">
+          <LoadingSpinner />
+          <p className="text-sm">서버에서 시세 수집 중입니다. 잠시 후 자동으로 표시됩니다.</p>
+        </div>
       ) : (
         <div className="overflow-y-auto flex-1">
           <table className="w-full text-sm">

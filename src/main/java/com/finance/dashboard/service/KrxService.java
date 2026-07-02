@@ -19,6 +19,8 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import org.springframework.scheduling.annotation.Async;
+
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -33,6 +35,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
 @Service
@@ -62,6 +65,7 @@ public class KrxService {
             .followRedirects(HttpClient.Redirect.ALWAYS)
             .build();
     private final ObjectMapper objectMapper = new ObjectMapper();
+    private final AtomicBoolean loadingInProgress = new AtomicBoolean(false);
 
     // ── 최신 거래일 ─────────────────────────────────────────────
 
@@ -87,17 +91,35 @@ public class KrxService {
 
     // ── 전종목 시세 로드 (Naver Finance HTML 스크래핑) ──────────
 
+    public boolean isCacheReady(LocalDate date) {
+        return dailyPriceRepository.countByTradeDate(date) > 100;
+    }
+
+    /** 동기 로드 (시그널 생성 등 내부용) */
     @Transactional
     public void loadAllPrices(LocalDate date) {
-        long count = dailyPriceRepository.countByTradeDate(date);
-        if (count > 100) {
-            log.info("시세 이미 캐시됨: {} ({}건)", date, count);
+        if (isCacheReady(date)) {
+            log.info("시세 이미 캐시됨: {}", date);
             return;
         }
-        log.info("네이버 전종목 시세 로드 시작: {}", date);
-        loadMarketFromNaver("KOSPI", 0, date);
-        loadMarketFromNaver("KOSDAQ", 1, date);
-        log.info("네이버 전종목 시세 로드 완료: {}", date);
+        if (!loadingInProgress.compareAndSet(false, true)) {
+            log.info("시세 로드 이미 진행 중: {}", date);
+            return;
+        }
+        try {
+            log.info("네이버 전종목 시세 로드 시작: {}", date);
+            loadMarketFromNaver("KOSPI", 0, date);
+            loadMarketFromNaver("KOSDAQ", 1, date);
+            log.info("네이버 전종목 시세 로드 완료: {}", date);
+        } finally {
+            loadingInProgress.set(false);
+        }
+    }
+
+    /** 비동기 로드 (API 요청 블로킹 방지) */
+    @Async
+    public void loadAllPricesAsync(LocalDate date) {
+        loadAllPrices(date);
     }
 
     private void loadMarketFromNaver(String market, int sosok, LocalDate date) {
@@ -186,7 +208,7 @@ public class KrxService {
 
     public Optional<KrxDailyPrice> getCurrentPrice(String stockCode) {
         LocalDate date = resolveLatestTradingDate();
-        loadAllPrices(date);
+        if (!isCacheReady(date)) loadAllPricesAsync(date);
         return dailyPriceRepository.findByStockCodeAndTradeDate(stockCode, date);
     }
 
@@ -194,7 +216,7 @@ public class KrxService {
 
     public List<KrxStockInfo> searchStocks(String keyword) {
         if (stockInfoRepository.count() == 0) {
-            loadAllPrices(resolveLatestTradingDate());
+            loadAllPricesAsync(resolveLatestTradingDate());
         }
         return stockInfoRepository
                 .findByStockNameContainingOrStockCodeContaining(keyword, keyword);
@@ -513,7 +535,10 @@ public class KrxService {
 
     public List<KrxDailyPrice> getTopByMarketCap(String market, int limit) {
         LocalDate date = resolveLatestTradingDate();
-        loadAllPrices(date);
+        // 캐시 미준비 시 백그라운드 로드 트리거 후 즉시 반환 (로딩 중 빈 목록)
+        if (!isCacheReady(date)) {
+            loadAllPricesAsync(date);
+        }
         PageRequest page = PageRequest.of(0, limit);
         if (market == null || market.isBlank()) {
             return dailyPriceRepository.findByTradeDateOrderByMarketCapDesc(date, page);
