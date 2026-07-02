@@ -89,8 +89,9 @@ public class KrxService {
 
     @Transactional
     public void loadAllPrices(LocalDate date) {
-        if (dailyPriceRepository.existsByTradeDate(date)) {
-            log.info("시세 이미 캐시됨: {}", date);
+        long count = dailyPriceRepository.countByTradeDate(date);
+        if (count > 100) {
+            log.info("시세 이미 캐시됨: {} ({}건)", date, count);
             return;
         }
         log.info("네이버 전종목 시세 로드 시작: {}", date);
@@ -406,38 +407,32 @@ public class KrxService {
     }
 
     private NaverFinanceInfo scrapeNaverFinanceInfo(String stockCode) {
+        // 1차: Naver 모바일 JSON API (PER/EPS/PBR/BPS 직접 제공)
+        BigDecimal per = null, eps = null, pbr = null, bps = null, roe = null, dividendYield = null;
         try {
-            String url = "https://finance.naver.com/item/coinfo.naver?code=" + stockCode + "&target=fund";
-            Document doc = Jsoup.connect(url)
-                    .userAgent(USER_AGENT)
-                    .header("Accept-Language", "ko-KR,ko;q=0.9")
-                    .header("Referer", "https://finance.naver.com/item/main.naver?code=" + stockCode)
-                    .timeout(10_000)
-                    .get();
-
-            // PER, EPS, PBR, BPS, ROE, 배당수익률 파싱 (table.tb_type1 구조)
-            java.util.Map<String, String> data = new java.util.HashMap<>();
-            for (Element tr : doc.select("table tr")) {
-                Elements ths = tr.select("th");
-                Elements tds = tr.select("td");
-                for (int i = 0; i < ths.size() && i < tds.size(); i++) {
-                    String key = ths.get(i).text().trim().replaceAll("\\s+", "");
-                    String val = tds.get(i).text().trim().replaceAll("[^0-9.\\-]", "");
-                    if (!key.isBlank() && !val.isBlank()) data.put(key, val);
-                }
+            JsonNode basic = getJson(String.format(NAVER_BASIC_URL, stockCode));
+            if (basic != null) {
+                per = jsonBD(basic, "per");
+                eps = jsonBD(basic, "eps");
+                pbr = jsonBD(basic, "pbr");
+                bps = jsonBD(basic, "bps");
+                log.debug("모바일 API 투자지표 [{}]: per={} eps={} pbr={} bps={}", stockCode, per, eps, pbr, bps);
             }
+        } catch (Exception e) {
+            log.debug("모바일 API 실패 [{}]: {}", stockCode, e.getMessage());
+        }
 
-            // main 페이지에서 52주, 상장주식수, 외국인소진률 파싱
+        // 2차: PC main 페이지 HTML → 52주, 상장주식수, 외국인소진률, PER fallback
+        long high52w = 0L, low52w = 0L, shares = 0L;
+        BigDecimal foreignRatio = null;
+        try {
             Document main = Jsoup.connect("https://finance.naver.com/item/main.naver?code=" + stockCode)
                     .userAgent(USER_AGENT)
                     .header("Accept-Language", "ko-KR,ko;q=0.9")
                     .timeout(10_000)
                     .get();
 
-            // 52주 고저
-            long high52w = 0L, low52w = 0L;
-            Element w52El = main.selectFirst("div.rate_info table");
-            if (w52El == null) w52El = main.selectFirst("table.no_info");
+            // 52주 고저 (.blind 텍스트로 찾기)
             for (Element tr : main.select("table tr")) {
                 String txt = tr.text();
                 if (txt.contains("52주") && (txt.contains("최고") || txt.contains("고가"))) {
@@ -446,10 +441,10 @@ public class KrxService {
                         high52w = parseLong(spans.get(0).text());
                         low52w  = parseLong(spans.get(1).text());
                     } else {
-                        Elements tds = tr.select("td");
-                        if (tds.size() >= 2) {
-                            high52w = parseLong(tds.get(0).text());
-                            low52w  = parseLong(tds.get(1).text());
+                        Elements tds2 = tr.select("td");
+                        if (tds2.size() >= 2) {
+                            high52w = parseLong(tds2.get(0).text());
+                            low52w  = parseLong(tds2.get(1).text());
                         }
                     }
                     if (high52w > 0) break;
@@ -457,7 +452,6 @@ public class KrxService {
             }
 
             // 상장주식수
-            long shares = 0L;
             for (Element tr : main.select("table tr")) {
                 if (tr.text().contains("상장주식수")) {
                     Element td = tr.selectFirst("td");
@@ -467,7 +461,6 @@ public class KrxService {
             }
 
             // 외국인소진률
-            BigDecimal foreignRatio = null;
             for (Element tr : main.select("table tr")) {
                 if (tr.text().contains("외국인소진률") || tr.text().contains("외인소진")) {
                     Element td = tr.selectFirst("td");
@@ -476,34 +469,39 @@ public class KrxService {
                 }
             }
 
-            // 투자지표 fallback: main 페이지 table에서도 시도
-            if (!data.containsKey("PER")) {
+            // PER/EPS fallback: th/td 페어링 (행 단위)
+            if (per == null) {
+                java.util.Map<String, String> data = new java.util.HashMap<>();
                 for (Element tr : main.select("table tr")) {
                     Elements ths = tr.select("th");
-                    Elements tds = tr.select("td");
-                    for (int i = 0; i < ths.size() && i < tds.size(); i++) {
+                    Elements tds2 = tr.select("td");
+                    for (int i = 0; i < ths.size() && i < tds2.size(); i++) {
                         String key = ths.get(i).text().trim().replaceAll("\\s+", "");
-                        String val = tds.get(i).text().trim().replaceAll("[^0-9.\\-]", "");
+                        String val = tds2.get(i).text().trim().replaceAll("[^0-9.\\-]", "");
                         if (!key.isBlank() && !val.isBlank()) data.putIfAbsent(key, val);
                     }
                 }
+                if (per == null) per = parseOrNull(data.getOrDefault("PER", data.get("PER배율")));
+                if (eps == null) eps = parseOrNull(data.getOrDefault("EPS", data.get("EPS원")));
+                if (pbr == null) pbr = parseOrNull(data.getOrDefault("PBR", data.get("PBR배율")));
+                if (bps == null) bps = parseOrNull(data.getOrDefault("BPS", data.get("BPS원")));
+                if (roe == null) roe = parseOrNull(data.getOrDefault("ROE", data.get("ROE%")));
+                if (dividendYield == null) dividendYield = parseOrNull(data.get("배당수익률"));
+                log.debug("HTML fallback 투자지표 [{}]: {}", stockCode, data);
             }
-
-            log.debug("투자지표 [{}]: {}", stockCode, data);
-
-            return new NaverFinanceInfo(
-                    parseOrNull(data.getOrDefault("PER", data.get("PER배율"))),
-                    parseOrNull(data.getOrDefault("EPS", data.get("EPS원"))),
-                    parseOrNull(data.getOrDefault("PBR", data.get("PBR배율"))),
-                    parseOrNull(data.getOrDefault("BPS", data.get("BPS원"))),
-                    parseOrNull(data.getOrDefault("ROE", data.get("ROE%"))),
-                    parseOrNull(data.getOrDefault("배당수익률", data.get("배당수익률%"))),
-                    high52w, low52w, shares, foreignRatio
-            );
         } catch (Exception e) {
-            log.warn("투자정보 스크래핑 실패 [{}]: {}", stockCode, e.getMessage());
-            return NaverFinanceInfo.empty();
+            log.warn("투자정보 HTML 스크래핑 실패 [{}]: {}", stockCode, e.getMessage());
         }
+
+        return new NaverFinanceInfo(per, eps, pbr, bps, roe, dividendYield,
+                high52w, low52w, shares, foreignRatio);
+    }
+
+    private BigDecimal jsonBD(JsonNode node, String field) {
+        JsonNode n = node.get(field);
+        if (n == null || n.isNull() || n.asText().equals("-") || n.asText().isBlank()) return null;
+        try { return new BigDecimal(n.asText().replaceAll("[^0-9.\\-]", "")); }
+        catch (Exception e) { return null; }
     }
 
     private BigDecimal parseOrNull(String raw) {

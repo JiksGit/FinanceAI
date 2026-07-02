@@ -15,6 +15,8 @@ public interface KrxDailyPriceRepository extends JpaRepository<KrxDailyPrice, Lo
 
     boolean existsByTradeDate(LocalDate tradeDate);
 
+    long countByTradeDate(LocalDate tradeDate);
+
     List<KrxDailyPrice> findByStockCodeAndTradeDateBetweenOrderByTradeDateDesc(
             String stockCode, LocalDate from, LocalDate to);
 
