@@ -9,6 +9,8 @@ public record FavoriteStockResponse(
         Integer quantity,
         BigDecimal avgPrice,
         BigDecimal currentPrice,
+        BigDecimal priceChange,
+        BigDecimal changeRate,
         BigDecimal profitLoss,
         BigDecimal profitLossRate,
         LocalDateTime createdAt

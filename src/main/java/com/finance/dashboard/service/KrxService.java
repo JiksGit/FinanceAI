@@ -155,8 +155,11 @@ public class KrxService {
 
                     String name = link.text().trim();
                     long closePrice = parseLong(cells.get(2).text());
-                    long priceChange = parseChange(cells.get(3));
                     BigDecimal changeRate = parseBD(cells.get(4).text());
+                    // changeRate 부호를 기준으로 priceChange 방향 결정 (img 방향 파싱보다 신뢰성 높음)
+                    long priceChangeAbs = parseLong(cells.get(3).text());
+                    long priceChange = changeRate.compareTo(BigDecimal.ZERO) < 0
+                            ? -priceChangeAbs : priceChangeAbs;
                     long marketCap = parseMarketCap(cells.get(6).text()); // 억원 단위
                     long volume = parseLong(cells.get(9).text());
 

@@ -147,15 +147,18 @@ public class StockService {
 
     private FavoriteStockResponse toFavoriteResponse(FavoriteStock fav) {
         BigDecimal currentPrice = null;
+        BigDecimal priceChange = null;
+        BigDecimal changeRate = null;
         BigDecimal profitLoss = null;
         BigDecimal profitLossRate = null;
 
         try {
-            currentPrice = BigDecimal.valueOf(
-                    krxService.getCurrentPrice(fav.getStockSymbol())
-                            .map(KrxDailyPrice::getClosePrice)
-                            .orElse(0L));
-            if (currentPrice.compareTo(BigDecimal.ZERO) == 0) currentPrice = null;
+            KrxDailyPrice dailyPrice = krxService.getCurrentPrice(fav.getStockSymbol()).orElse(null);
+            if (dailyPrice != null && dailyPrice.getClosePrice() > 0) {
+                currentPrice = BigDecimal.valueOf(dailyPrice.getClosePrice());
+                priceChange = BigDecimal.valueOf(dailyPrice.getPriceChange());
+                changeRate = dailyPrice.getChangeRate();
+            }
         } catch (Exception e) {
             log.warn("현재가 조회 실패: {}", fav.getStockSymbol());
         }
@@ -176,6 +179,8 @@ public class StockService {
                 fav.getQuantity(),
                 fav.getAvgPrice(),
                 currentPrice,
+                priceChange,
+                changeRate,
                 profitLoss,
                 profitLossRate,
                 fav.getCreatedAt()

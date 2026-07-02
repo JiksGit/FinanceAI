@@ -122,8 +122,8 @@ export default function MarketTopTable({ limit = 50, onSelect, selectedCode, lin
                 const rate = live?.changeRate ?? stock.changeRate
                 const volume = live?.volume ?? stock.volume
 
-                const isUp = change > 0
-                const isDown = change < 0
+                const isUp = Number(rate) > 0
+                const isDown = Number(rate) < 0
                 const isSelected = selectedCode === stock.stockCode
                 return (
                   <tr

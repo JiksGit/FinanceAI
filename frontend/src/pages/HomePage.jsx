@@ -27,6 +27,8 @@ function PortfolioRow({ fav }) {
   const hasHolding = fav.quantity && fav.quantity > 0
   const isProfit = fav.profitLoss > 0
   const isLoss = fav.profitLoss < 0
+  const isUp = Number(fav.changeRate) > 0
+  const isDown = Number(fav.changeRate) < 0
 
   return (
     <div className="flex items-center justify-between py-2.5">
@@ -38,8 +40,13 @@ function PortfolioRow({ fav }) {
       </div>
       <div className="text-right">
         {fav.currentPrice != null && (
-          <p className="text-sm font-semibold text-slate-800">
+          <p className={`text-sm font-semibold ${isUp ? 'text-red-500' : isDown ? 'text-blue-500' : 'text-slate-800'}`}>
             ₩{Number(fav.currentPrice).toLocaleString('ko-KR')}
+            {fav.changeRate != null && (
+              <span className="ml-1 text-xs font-normal">
+                ({isUp ? '+' : ''}{Number(fav.changeRate).toFixed(2)}%)
+              </span>
+            )}
           </p>
         )}
         {hasHolding && fav.profitLoss != null && (
