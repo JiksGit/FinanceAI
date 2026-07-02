@@ -19,8 +19,6 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import org.springframework.scheduling.annotation.Async;
-
 import java.math.BigDecimal;
 import java.net.URI;
 import java.net.http.HttpClient;
@@ -35,6 +33,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 @Slf4j
@@ -116,10 +115,9 @@ public class KrxService {
         }
     }
 
-    /** 비동기 로드 (API 요청 블로킹 방지) */
-    @Async
+    /** 비동기 로드 (CompletableFuture - @Async 자기호출 우회) */
     public void loadAllPricesAsync(LocalDate date) {
-        loadAllPrices(date);
+        CompletableFuture.runAsync(() -> loadAllPrices(date));
     }
 
     private void loadMarketFromNaver(String market, int sosok, LocalDate date) {
