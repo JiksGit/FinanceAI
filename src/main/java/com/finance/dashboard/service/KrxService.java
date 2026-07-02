@@ -287,20 +287,15 @@ public class KrxService {
 
     public StockDetailResponse getStockDetail(String stockCode) {
         LocalDate date = resolveLatestTradingDate();
-        loadAllPrices(date);
 
+        // DB 캐시에서 먼저 조회; 없으면 Naver 개별 종목 페이지에서 직접 스크래핑
         KrxDailyPrice price = dailyPriceRepository
                 .findByStockCodeAndTradeDate(stockCode, date)
-                .orElseGet(() -> {
-                    // 당일 전체 로드 후 재시도
-                    loadAllPrices(date);
-                    return dailyPriceRepository.findByStockCodeAndTradeDate(stockCode, date).orElse(null);
-                });
+                .orElseGet(() -> scrapeIndividualStock(stockCode, date));
 
         if (price == null) throw new RuntimeException("종목 데이터 없음: " + stockCode);
         KrxStockInfo info = stockInfoRepository.findById(stockCode).orElse(null);
 
-        // Naver Finance main 페이지에서 투자지표 스크래핑
         NaverFinanceInfo naver = scrapeNaverFinanceInfo(stockCode);
 
         return new StockDetailResponse(
@@ -315,7 +310,7 @@ public class KrxService {
                 price.getHighPrice(),
                 price.getLowPrice(),
                 price.getVolume(),
-                price.getMarketCap(),
+                price.getMarketCap() != null ? price.getMarketCap() : 0L,
                 naver.per(),
                 naver.eps(),
                 naver.pbr(),
@@ -327,6 +322,81 @@ public class KrxService {
                 naver.sharesOutstanding(),
                 naver.foreignRatio()
         );
+    }
+
+    /**
+     * 시가총액 상위권 외 종목: Naver Finance 개별 종목 시세 페이지에서 당일 가격 스크래핑
+     */
+    @Transactional
+    private KrxDailyPrice scrapeIndividualStock(String stockCode, LocalDate date) {
+        try {
+            String url = "https://finance.naver.com/item/main.naver?code=" + stockCode;
+            Document doc = Jsoup.connect(url)
+                    .userAgent(USER_AGENT)
+                    .header("Accept-Language", "ko-KR,ko;q=0.9")
+                    .timeout(10_000)
+                    .get();
+
+            // 종목명
+            Element nameEl = doc.selectFirst("div.wrap_company h2 a");
+            String stockName = nameEl != null ? nameEl.text().trim() : stockCode;
+
+            // 현재가
+            Element priceEl = doc.selectFirst("p.no_today .blind");
+            long closePrice = priceEl != null ? parseLong(priceEl.text()) : 0L;
+
+            // 등락
+            Element changeEl = doc.selectFirst("p.no_exday .blind");
+            long priceChange = 0L;
+            BigDecimal changeRate = BigDecimal.ZERO;
+            if (changeEl != null) {
+                boolean negative = doc.select("p.no_exday .ico.down").size() > 0;
+                priceChange = parseLong(changeEl.text());
+                if (negative) priceChange = -priceChange;
+            }
+
+            // 거래량
+            long volume = 0L;
+            for (Element tr : doc.select("table.no_info tr")) {
+                if (tr.text().contains("거래량")) {
+                    Element td = tr.selectFirst("td");
+                    if (td != null) volume = parseLong(td.text());
+                    break;
+                }
+            }
+
+            // 시장 (KOSPI/KOSDAQ)
+            String market = "KOSPI";
+            Element marketEl = doc.selectFirst("div.wrap_company .exchange_name");
+            if (marketEl != null && marketEl.text().contains("KOSDAQ")) market = "KOSDAQ";
+
+            // KrxStockInfo upsert
+            final String mkt = market;
+            stockInfoRepository.findById(stockCode).ifPresentOrElse(
+                    info -> {},
+                    () -> stockInfoRepository.save(KrxStockInfo.builder()
+                            .stockCode(stockCode).isinCode(null)
+                            .stockName(stockName).market(mkt).sector(null)
+                            .build())
+            );
+
+            KrxDailyPrice entity = KrxDailyPrice.builder()
+                    .stockCode(stockCode).stockName(stockName).market(market)
+                    .tradeDate(date)
+                    .closePrice(closePrice).openPrice(0L).highPrice(0L).lowPrice(0L)
+                    .priceChange(priceChange).changeRate(changeRate)
+                    .volume(volume).marketCap(null)
+                    .build();
+
+            // 중복 저장 방지
+            if (dailyPriceRepository.findByStockCodeAndTradeDate(stockCode, date).isEmpty()) {
+                dailyPriceRepository.save(entity);
+            }
+            return entity;
+        } catch (Exception e) {
+            log.warn("개별 종목 스크래핑 실패 [{}]: {}", stockCode, e.getMessage());
+            return null;
+        }
     }
 
     private record NaverFinanceInfo(
