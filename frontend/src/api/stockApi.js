@@ -29,3 +29,6 @@ export const getTopStocks = (market = '', limit = 50) =>
 
 export const getStockDetail = (symbol) =>
   api.get(`/stock/${symbol}/detail`).then((res) => res.data)
+
+export const getMarketIndices = () =>
+  api.get('/stock/market/indices').then((res) => res.data)

@@ -10,6 +10,7 @@ import com.finance.dashboard.dto.response.StockResponse;
 import com.finance.dashboard.dto.response.StockSearchResult;
 import com.finance.dashboard.dto.response.TopStockResponse;
 import com.finance.dashboard.security.UserPrincipal;
+import com.finance.dashboard.dto.response.MarketIndexResponse;
 import com.finance.dashboard.dto.response.StockDetailResponse;
 import com.finance.dashboard.service.KrxService;
 import com.finance.dashboard.service.StockService;
@@ -93,6 +94,11 @@ public class StockController {
     @GetMapping("/{symbol}/news")
     public NewsResponse getNews(@PathVariable String symbol) {
         return stockService.getNews(symbol);
+    }
+
+    @GetMapping("/market/indices")
+    public List<MarketIndexResponse> getMarketIndices() {
+        return krxService.getMarketIndices();
     }
 
     @GetMapping("/market/debug")

@@ -6,6 +6,7 @@ import { getRecentSignals } from '../api/signalApi'
 import { useAuth } from '../hooks/useAuth'
 import ExchangeRateChart from '../components/exchange/ExchangeRateChart'
 import MarketTopTable from '../components/stock/MarketTopTable'
+import MarketIndexWidget from '../components/stock/MarketIndexWidget'
 import { getRateHistory } from '../api/exchangeApi'
 import LoadingSpinner from '../components/common/LoadingSpinner'
 
@@ -162,6 +163,9 @@ export default function HomePage() {
           {new Date().toLocaleDateString('ko-KR', { year: 'numeric', month: '2-digit', day: '2-digit' }).replace(/\. /g, '-').replace('.', '')} 기준
         </p>
       </div>
+
+      {/* 국내 증시 지수 위젯 */}
+      <MarketIndexWidget />
 
       {/* 요약 카드 3개 */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

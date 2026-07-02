@@ -3,6 +3,7 @@ package com.finance.dashboard.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.finance.dashboard.config.KrxConfig;
+import com.finance.dashboard.dto.response.MarketIndexResponse;
 import com.finance.dashboard.dto.response.StockDetailResponse;
 import com.finance.dashboard.entity.KrxDailyPrice;
 import com.finance.dashboard.entity.KrxStockInfo;
@@ -420,6 +421,69 @@ public class KrxService {
             return dailyPriceRepository.findByTradeDateOrderByMarketCapDesc(date, page);
         }
         return dailyPriceRepository.findByTradeDateAndMarketOrderByMarketCapDesc(date, market, page);
+    }
+
+    // ── KOSPI/KOSDAQ 지수 ──────────────────────────────────────────
+
+    /**
+     * 네이버 금융 지수 페이지에서 KOSPI/KOSDAQ 현재값·등락 스크래핑
+     * URL: https://finance.naver.com/sise/sise_index.naver?code=KOSPI
+     */
+    public List<MarketIndexResponse> getMarketIndices() {
+        List<MarketIndexResponse> result = new ArrayList<>();
+        for (String[] indexInfo : new String[][]{{"KOSPI", "KOSPI"}, {"KOSDAQ", "KOSDAQ"}}) {
+            String code = indexInfo[0];
+            String name = indexInfo[1];
+            try {
+                String url = "https://finance.naver.com/sise/sise_index.naver?code=" + code;
+                Document doc = Jsoup.connect(url)
+                        .userAgent(USER_AGENT)
+                        .header("Accept-Language", "ko-KR,ko;q=0.9")
+                        .timeout(8_000)
+                        .get();
+
+                // 현재 지수값
+                Element nowEl = doc.selectFirst("#now_value");
+                if (nowEl == null) nowEl = doc.selectFirst(".num.today");
+                BigDecimal current = nowEl != null ? parseBD(nowEl.text()) : BigDecimal.ZERO;
+
+                // 등락 (절대값 + 방향)
+                Element changeEl = doc.selectFirst("#change_value");
+                BigDecimal change = BigDecimal.ZERO;
+                if (changeEl != null) {
+                    boolean negative = doc.select(".now_down").size() > 0
+                            || doc.select("img[src*=down]").size() > 0
+                            || doc.select("img[src*=fall]").size() > 0;
+                    change = parseBD(changeEl.text());
+                    if (negative) change = change.negate();
+                }
+
+                // 등락률
+                Element rateEl = doc.selectFirst("#change_rate");
+                BigDecimal changeRate = rateEl != null ? parseBD(rateEl.text()) : BigDecimal.ZERO;
+                if (change.compareTo(BigDecimal.ZERO) < 0) changeRate = changeRate.negate();
+
+                // 거래량·거래대금
+                long volume = 0L, tradingValue = 0L;
+                for (Element tr : doc.select("table.tb_type1 tr")) {
+                    String text = tr.text();
+                    if (text.contains("거래량")) {
+                        Element td = tr.selectFirst("td");
+                        if (td != null) volume = parseLong(td.text());
+                    }
+                    if (text.contains("거래대금")) {
+                        Element td = tr.selectFirst("td");
+                        if (td != null) tradingValue = parseLong(td.text());
+                    }
+                }
+
+                result.add(new MarketIndexResponse(name, current, change, changeRate, volume, tradingValue));
+            } catch (Exception e) {
+                log.warn("지수 스크래핑 실패 [{}]: {}", code, e.getMessage());
+                result.add(new MarketIndexResponse(name, BigDecimal.ZERO, BigDecimal.ZERO, BigDecimal.ZERO, 0L, 0L));
+            }
+        }
+        return result;
     }
 
     // ── 디버그용 raw JSON ─────────────────────────────────────────
