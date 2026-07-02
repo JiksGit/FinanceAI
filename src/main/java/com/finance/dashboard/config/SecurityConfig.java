@@ -34,6 +34,7 @@ public class SecurityConfig {
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/api/auth/signup", "/api/auth/login", "/api/auth/refresh", "/api/auth/logout").permitAll()
                         .requestMatchers("/api/exchange/**").permitAll()
+                        .requestMatchers("/api/metals/**").permitAll()
                         .requestMatchers("/api/internal/**").authenticated()
                         .requestMatchers("/api/stock/favorites", "/api/stock/favorites/**").authenticated()
                         .requestMatchers("/api/stock/market/**",

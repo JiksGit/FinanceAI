@@ -214,7 +214,6 @@ export default function StockDetailPage() {
                 </span>
               </div>
             </div>
-            </div>
           </div>
 
           {/* 즐겨찾기 + 시가총액 */}
