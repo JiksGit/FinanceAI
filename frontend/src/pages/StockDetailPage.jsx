@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { useMarketPrices } from '../hooks/useMarketPrices'
 import {
   addFavorite,
   getFavorites,
@@ -90,6 +91,7 @@ export default function StockDetailPage() {
   const [loading, setLoading] = useState(true)
   const [histLoading, setHistLoading] = useState(false)
   const [error, setError] = useState(null)
+  const { prices: livePrices, connected } = useMarketPrices()
 
   useEffect(() => {
     if (isAuthenticated) getFavorites().then(setFavorites).catch(() => {})
@@ -147,8 +149,11 @@ export default function StockDetailPage() {
     </div>
   )
 
-  const change = detail.priceChange
-  const changeRate = Number(detail.changeRate)
+  // 실시간 가격 오버레이
+  const live = livePrices.get(code)
+  const currentPrice = live?.closePrice ?? detail.closePrice
+  const change = live?.priceChange ?? detail.priceChange
+  const changeRate = Number(live?.changeRate ?? detail.changeRate)
   const isUp = change > 0
   const isDown = change < 0
 
@@ -188,9 +193,15 @@ export default function StockDetailPage() {
 
             {/* 현재가 */}
             <div className="mt-4">
-              <p className={`text-4xl font-bold tabular-nums ${priceColor(change)}`}>
-                ₩{Number(detail.closePrice).toLocaleString('ko-KR')}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className={`text-4xl font-bold tabular-nums ${priceColor(change)}`}>
+                  ₩{Number(currentPrice).toLocaleString('ko-KR')}
+                </p>
+                <span className={`flex items-center gap-1 text-xs ${connected ? 'text-green-500' : 'text-slate-300'}`}>
+                  <span className={`inline-block h-1.5 w-1.5 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
+                  {connected ? '실시간' : '연결 중'}
+                </span>
+              </div>
               <div className={`mt-1.5 flex items-center gap-3 text-base ${priceColor(change)}`}>
                 <span className="font-semibold">
                   {isUp ? '▲' : isDown ? '▼' : '–'}{' '}
@@ -202,6 +213,7 @@ export default function StockDetailPage() {
                   {isUp ? '+' : ''}{changeRate.toFixed(2)}%
                 </span>
               </div>
+            </div>
             </div>
           </div>
 

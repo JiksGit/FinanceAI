@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getTopStocks } from '../../api/stockApi'
+import { useMarketPrices } from '../../hooks/useMarketPrices'
 import LoadingSpinner from '../common/LoadingSpinner'
 
 const MARKETS = [
@@ -33,6 +34,7 @@ export default function MarketTopTable({ limit = 50, onSelect, selectedCode, lin
   const [stocks, setStocks] = useState([])
   const [market, setMarket] = useState('')
   const [loading, setLoading] = useState(true)
+  const { prices: livePrices, connected } = useMarketPrices()
 
   useEffect(() => {
     setLoading(true)
@@ -59,8 +61,12 @@ export default function MarketTopTable({ limit = 50, onSelect, selectedCode, lin
             {m.label}
           </button>
         ))}
-        <span className="ml-auto text-xs text-slate-400 self-center">
+        <span className="ml-auto flex items-center gap-2 text-xs text-slate-400 self-center">
           {stocks.length > 0 && `${stocks.length}종목`}
+          <span className={`flex items-center gap-1 ${connected ? 'text-green-500' : 'text-slate-300'}`}>
+            <span className={`inline-block h-1.5 w-1.5 rounded-full ${connected ? 'bg-green-500 animate-pulse' : 'bg-slate-300'}`} />
+            {connected ? '실시간' : '연결 중'}
+          </span>
         </span>
       </div>
 
@@ -81,8 +87,15 @@ export default function MarketTopTable({ limit = 50, onSelect, selectedCode, lin
             </thead>
             <tbody>
               {stocks.map((stock, i) => {
-                const isUp = stock.priceChange > 0
-                const isDown = stock.priceChange < 0
+                // 실시간 가격으로 오버레이 (있으면 사용)
+                const live = livePrices.get(stock.stockCode)
+                const price = live?.closePrice ?? stock.closePrice
+                const change = live?.priceChange ?? stock.priceChange
+                const rate = live?.changeRate ?? stock.changeRate
+                const volume = live?.volume ?? stock.volume
+
+                const isUp = change > 0
+                const isDown = change < 0
                 const isSelected = selectedCode === stock.stockCode
                 return (
                   <tr
@@ -109,24 +122,24 @@ export default function MarketTopTable({ limit = 50, onSelect, selectedCode, lin
                         }`}>{stock.market}</span>
                       </div>
                     </td>
-                    <td className={`py-2 pr-2 text-right font-semibold tabular-nums ${
+                    <td className={`py-2 pr-2 text-right font-semibold tabular-nums transition-colors ${
                       isUp ? 'text-red-500' : isDown ? 'text-blue-500' : 'text-slate-800'
                     }`}>
-                      {Number(stock.closePrice).toLocaleString('ko-KR')}
+                      {Number(price).toLocaleString('ko-KR')}
                     </td>
                     <td className={`py-2 pr-2 text-right text-xs tabular-nums ${
                       isUp ? 'text-red-500' : isDown ? 'text-blue-500' : 'text-slate-400'
                     }`}>
-                      <div>{isUp ? '+' : ''}{Number(stock.priceChange).toLocaleString()}</div>
+                      <div>{isUp ? '+' : ''}{Number(change).toLocaleString()}</div>
                       <div className="font-medium">
-                        {isUp ? '+' : ''}{Number(stock.changeRate).toFixed(2)}%
+                        {isUp ? '+' : ''}{Number(rate).toFixed(2)}%
                       </div>
                     </td>
                     <td className="py-2 pr-2 text-right text-xs text-slate-500 tabular-nums hidden lg:table-cell">
-                      {Number(stock.volume).toLocaleString()}
+                      {Number(volume).toLocaleString()}
                     </td>
                     <td className="py-2 pr-2 text-right text-xs text-slate-600 font-medium hidden xl:table-cell">
-                      {formatMarketCap(stock.marketCap)}
+                      {formatMarketCap(live?.marketCap ?? stock.marketCap)}
                     </td>
                   </tr>
                 )
