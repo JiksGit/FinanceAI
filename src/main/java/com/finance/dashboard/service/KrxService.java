@@ -533,9 +533,10 @@ public class KrxService {
 
     public List<KrxDailyPrice> getTopByMarketCap(String market, int limit) {
         LocalDate date = resolveLatestTradingDate();
-        // 캐시 미준비 시 백그라운드 로드 트리거 후 즉시 반환 (로딩 중 빈 목록)
+        // 전종목 캐시가 준비되지 않은 경우: 백그라운드 로드 트리거 후 빈 목록 반환
         if (!isCacheReady(date)) {
             loadAllPricesAsync(date);
+            return List.of();
         }
         PageRequest page = PageRequest.of(0, limit);
         if (market == null || market.isBlank()) {

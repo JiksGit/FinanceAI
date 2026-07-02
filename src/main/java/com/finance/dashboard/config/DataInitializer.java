@@ -1,7 +1,9 @@
 package com.finance.dashboard.config;
 
 import com.finance.dashboard.entity.StockSignal;
+import com.finance.dashboard.repository.KrxDailyPriceRepository;
 import com.finance.dashboard.repository.StockSignalRepository;
+import com.finance.dashboard.service.KrxService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -17,12 +19,29 @@ import java.util.List;
 public class DataInitializer implements CommandLineRunner {
 
     private final StockSignalRepository signalRepository;
+    private final KrxDailyPriceRepository dailyPriceRepository;
+    private final KrxService krxService;
 
     @Override
     @Transactional
     public void run(String... args) {
+        cleanStalePartialCache();
         removeUsSymbols();
         seedKoreanSignals();
+    }
+
+    /** 100건 미만의 부분 캐시(스테일 데이터)가 있으면 삭제 후 비동기 재로드 */
+    private void cleanStalePartialCache() {
+        LocalDate date = LocalDate.now();
+        long count = dailyPriceRepository.countByTradeDate(date);
+        if (count > 0 && count <= 100) {
+            log.info("부분 캐시 {}건 감지 → 삭제 후 재로드", count);
+            dailyPriceRepository.deleteByTradeDate(date);
+        }
+        // 캐시가 없으면 백그라운드에서 로드 시작
+        if (dailyPriceRepository.countByTradeDate(date) == 0) {
+            krxService.loadAllPricesAsync(date);
+        }
     }
 
     private void removeUsSymbols() {
