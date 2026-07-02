@@ -388,10 +388,7 @@ public class KrxService {
                     .volume(volume).marketCap(null)
                     .build();
 
-            // 중복 저장 방지
-            if (dailyPriceRepository.findByStockCodeAndTradeDate(stockCode, date).isEmpty()) {
-                dailyPriceRepository.save(entity);
-            }
+            // DB에 저장하지 않음 - existsByTradeDate 트리거 방지 (bulk loadAllPrices 간섭 차단)
             return entity;
         } catch (Exception e) {
             log.warn("개별 종목 스크래핑 실패 [{}]: {}", stockCode, e.getMessage());
@@ -410,46 +407,58 @@ public class KrxService {
 
     private NaverFinanceInfo scrapeNaverFinanceInfo(String stockCode) {
         try {
-            String url = "https://finance.naver.com/item/main.naver?code=" + stockCode;
+            String url = "https://finance.naver.com/item/coinfo.naver?code=" + stockCode + "&target=fund";
             Document doc = Jsoup.connect(url)
+                    .userAgent(USER_AGENT)
+                    .header("Accept-Language", "ko-KR,ko;q=0.9")
+                    .header("Referer", "https://finance.naver.com/item/main.naver?code=" + stockCode)
+                    .timeout(10_000)
+                    .get();
+
+            // PER, EPS, PBR, BPS, ROE, 배당수익률 파싱 (table.tb_type1 구조)
+            java.util.Map<String, String> data = new java.util.HashMap<>();
+            for (Element tr : doc.select("table tr")) {
+                Elements ths = tr.select("th");
+                Elements tds = tr.select("td");
+                for (int i = 0; i < ths.size() && i < tds.size(); i++) {
+                    String key = ths.get(i).text().trim().replaceAll("\\s+", "");
+                    String val = tds.get(i).text().trim().replaceAll("[^0-9.\\-]", "");
+                    if (!key.isBlank() && !val.isBlank()) data.put(key, val);
+                }
+            }
+
+            // main 페이지에서 52주, 상장주식수, 외국인소진률 파싱
+            Document main = Jsoup.connect("https://finance.naver.com/item/main.naver?code=" + stockCode)
                     .userAgent(USER_AGENT)
                     .header("Accept-Language", "ko-KR,ko;q=0.9")
                     .timeout(10_000)
                     .get();
 
-            // th 텍스트로 인접 td 값 찾기 (robust)
-            java.util.Map<String, String> data = new java.util.HashMap<>();
-            for (Element th : doc.select("th, dt")) {
-                String key = th.text().replaceAll("[\\s\\(\\)]", "").trim();
-                Element sibling = th.nextElementSibling();
-                if (sibling != null) {
-                    data.put(key, sibling.text().replaceAll("[^0-9.\\-]", "").trim());
-                }
-            }
-
-            // 52주 범위: 별도 파싱 (형식: "93,400 47,800" 또는 두 td)
+            // 52주 고저
             long high52w = 0L, low52w = 0L;
-            for (Element tr : doc.select("table tr")) {
-                String rowText = tr.text();
-                if (rowText.contains("52주최고") || rowText.contains("52주 최고")) {
-                    Elements tds = tr.select("td");
-                    if (tds.size() >= 2) {
-                        high52w = parseLong(tds.get(0).text());
-                        low52w  = parseLong(tds.get(1).text());
-                    } else if (tds.size() == 1) {
-                        String[] parts = tds.get(0).text().split("\\s+");
-                        if (parts.length >= 2) {
-                            high52w = parseLong(parts[0]);
-                            low52w  = parseLong(parts[1]);
+            Element w52El = main.selectFirst("div.rate_info table");
+            if (w52El == null) w52El = main.selectFirst("table.no_info");
+            for (Element tr : main.select("table tr")) {
+                String txt = tr.text();
+                if (txt.contains("52주") && (txt.contains("최고") || txt.contains("고가"))) {
+                    Elements spans = tr.select(".blind");
+                    if (spans.size() >= 2) {
+                        high52w = parseLong(spans.get(0).text());
+                        low52w  = parseLong(spans.get(1).text());
+                    } else {
+                        Elements tds = tr.select("td");
+                        if (tds.size() >= 2) {
+                            high52w = parseLong(tds.get(0).text());
+                            low52w  = parseLong(tds.get(1).text());
                         }
                     }
-                    break;
+                    if (high52w > 0) break;
                 }
             }
 
             // 상장주식수
             long shares = 0L;
-            for (Element tr : doc.select("table tr")) {
+            for (Element tr : main.select("table tr")) {
                 if (tr.text().contains("상장주식수")) {
                     Element td = tr.selectFirst("td");
                     if (td != null) shares = parseLong(td.text());
@@ -459,7 +468,7 @@ public class KrxService {
 
             // 외국인소진률
             BigDecimal foreignRatio = null;
-            for (Element tr : doc.select("table tr")) {
+            for (Element tr : main.select("table tr")) {
                 if (tr.text().contains("외국인소진률") || tr.text().contains("외인소진")) {
                     Element td = tr.selectFirst("td");
                     if (td != null) foreignRatio = parseBD(td.text());
@@ -467,13 +476,28 @@ public class KrxService {
                 }
             }
 
+            // 투자지표 fallback: main 페이지 table에서도 시도
+            if (!data.containsKey("PER")) {
+                for (Element tr : main.select("table tr")) {
+                    Elements ths = tr.select("th");
+                    Elements tds = tr.select("td");
+                    for (int i = 0; i < ths.size() && i < tds.size(); i++) {
+                        String key = ths.get(i).text().trim().replaceAll("\\s+", "");
+                        String val = tds.get(i).text().trim().replaceAll("[^0-9.\\-]", "");
+                        if (!key.isBlank() && !val.isBlank()) data.putIfAbsent(key, val);
+                    }
+                }
+            }
+
+            log.debug("투자지표 [{}]: {}", stockCode, data);
+
             return new NaverFinanceInfo(
-                    parseOrNull(data.get("PER")),
-                    parseOrNull(data.get("EPS")),
-                    parseOrNull(data.get("PBR")),
-                    parseOrNull(data.get("BPS")),
-                    parseOrNull(data.get("ROE")),
-                    parseOrNull(data.get("배당수익률")),
+                    parseOrNull(data.getOrDefault("PER", data.get("PER배율"))),
+                    parseOrNull(data.getOrDefault("EPS", data.get("EPS원"))),
+                    parseOrNull(data.getOrDefault("PBR", data.get("PBR배율"))),
+                    parseOrNull(data.getOrDefault("BPS", data.get("BPS원"))),
+                    parseOrNull(data.getOrDefault("ROE", data.get("ROE%"))),
+                    parseOrNull(data.getOrDefault("배당수익률", data.get("배당수익률%"))),
                     high52w, low52w, shares, foreignRatio
             );
         } catch (Exception e) {
