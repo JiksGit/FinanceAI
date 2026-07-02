@@ -43,7 +43,17 @@ public class StockService {
 
     public StockResponse getStock(String stockCode) {
         KrxDailyPrice price = krxService.getCurrentPrice(stockCode)
-                .orElseThrow(() -> new CustomException(ErrorCode.STOCK_NOT_FOUND));
+                .orElseGet(() -> {
+                    // DB에 없으면 당일 전체 로드 후 재시도
+                    try {
+                        krxService.loadAllPrices(krxService.resolveLatestTradingDate());
+                        return krxService.getCurrentPrice(stockCode).orElse(null);
+                    } catch (Exception e) {
+                        return null;
+                    }
+                });
+
+        if (price == null) throw new CustomException(ErrorCode.STOCK_NOT_FOUND);
 
         KrxStockInfo info = stockInfoRepository.findById(stockCode).orElse(null);
 

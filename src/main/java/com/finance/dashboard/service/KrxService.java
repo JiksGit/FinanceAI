@@ -291,7 +291,13 @@ public class KrxService {
 
         KrxDailyPrice price = dailyPriceRepository
                 .findByStockCodeAndTradeDate(stockCode, date)
-                .orElseThrow(() -> new RuntimeException("종목 데이터 없음: " + stockCode));
+                .orElseGet(() -> {
+                    // 당일 전체 로드 후 재시도
+                    loadAllPrices(date);
+                    return dailyPriceRepository.findByStockCodeAndTradeDate(stockCode, date).orElse(null);
+                });
+
+        if (price == null) throw new RuntimeException("종목 데이터 없음: " + stockCode);
         KrxStockInfo info = stockInfoRepository.findById(stockCode).orElse(null);
 
         // Naver Finance main 페이지에서 투자지표 스크래핑

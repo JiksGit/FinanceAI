@@ -60,14 +60,14 @@ public class MetalsService {
             JsonNode node = objectMapper.readTree(resp.body());
 
             BigDecimal priceUsd   = bd(node, "price");
-            BigDecimal prevClose  = bd(node, "prev_close_price");
-            BigDecimal changeUsd  = priceUsd.subtract(prevClose);
-            BigDecimal changeRate = prevClose.compareTo(BigDecimal.ZERO) != 0
-                    ? changeUsd.divide(prevClose, 6, RoundingMode.HALF_UP).multiply(BigDecimal.valueOf(100))
-                    : BigDecimal.ZERO;
+            // gold-api.com: ch = change amount, chp = change percent
+            BigDecimal changeUsd  = bd(node, "ch");
+            BigDecimal changeRate = bd(node, "chp");
 
             BigDecimal priceKrw      = priceUsd.multiply(usdKrw).setScale(0, RoundingMode.HALF_UP);
             BigDecimal priceGram24k  = bd(node, "price_gram_24k");
+
+            BigDecimal prevClose = priceUsd.subtract(changeUsd);
 
             return new MetalPriceResponse(
                     name, nameKr, "oz",
@@ -81,6 +81,23 @@ public class MetalsService {
         } catch (Exception e) {
             log.warn("metals 조회 실패 [{}]: {}", symbol, e.getMessage());
             return empty(name, nameKr);
+        }
+    }
+
+    public String getRawJson(String symbol) {
+        try {
+            String url = BASE_URL + symbol;
+            HttpRequest req = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .header("User-Agent", USER_AGENT)
+                    .header("Accept", "application/json")
+                    .timeout(Duration.ofSeconds(5))
+                    .GET()
+                    .build();
+            HttpResponse<String> resp = httpClient.send(req, HttpResponse.BodyHandlers.ofString(StandardCharsets.UTF_8));
+            return "status=" + resp.statusCode() + "\n" + resp.body();
+        } catch (Exception e) {
+            return "error: " + e.getMessage();
         }
     }
 

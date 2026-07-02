@@ -20,4 +20,9 @@ public class MetalsController {
     public List<MetalPriceResponse> getPrices() {
         return metalsService.getMetalPrices();
     }
+
+    @GetMapping("/debug")
+    public String debug() {
+        return metalsService.getRawJson("XAU");
+    }
 }
