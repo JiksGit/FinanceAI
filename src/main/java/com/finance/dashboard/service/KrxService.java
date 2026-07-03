@@ -69,15 +69,15 @@ public class KrxService {
     // ── 최신 거래일 ─────────────────────────────────────────────
 
     public LocalDate resolveLatestTradingDate() {
-        Optional<LocalDate> cached = dailyPriceRepository.findLatestTradeDate();
-        if (cached.isPresent() && !cached.get().isBefore(LocalDate.now().minusDays(7))) {
-            return cached.get();
-        }
         LocalTime nowKst = LocalTime.now(ZoneId.of("Asia/Seoul"));
-        LocalDate start = nowKst.isBefore(LocalTime.of(15, 30))
-                ? LocalDate.now().minusDays(1) : LocalDate.now();
+        LocalDate today = LocalDate.now(ZoneId.of("Asia/Seoul"));
+        DayOfWeek dow = today.getDayOfWeek();
 
-        LocalDate cursor = start;
+        // 평일 9시 이후 → 오늘 거래일, 그 전(장전/주말) → 전 거래일
+        boolean marketOpenedToday = nowKst.isAfter(LocalTime.of(9, 0))
+                && dow != DayOfWeek.SATURDAY && dow != DayOfWeek.SUNDAY;
+
+        LocalDate cursor = marketOpenedToday ? today : today.minusDays(1);
         for (int i = 0; i < 10; i++) {
             if (cursor.getDayOfWeek() != DayOfWeek.SATURDAY
                     && cursor.getDayOfWeek() != DayOfWeek.SUNDAY) {

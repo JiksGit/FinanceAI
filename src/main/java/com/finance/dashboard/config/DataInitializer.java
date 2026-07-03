@@ -32,10 +32,10 @@ public class DataInitializer implements CommandLineRunner {
 
     /** 100건 미만의 부분 캐시(스테일 데이터)가 있으면 삭제 후 비동기 재로드 */
     private void cleanStalePartialCache() {
-        LocalDate date = LocalDate.now();
+        LocalDate date = krxService.resolveLatestTradingDate();
         long count = dailyPriceRepository.countByTradeDate(date);
         if (count > 0 && count <= 100) {
-            log.info("부분 캐시 {}건 감지 → 삭제 후 재로드", count);
+            log.info("부분 캐시 {}건 감지 ({}) → 삭제 후 재로드", count, date);
             dailyPriceRepository.deleteByTradeDate(date);
         }
         // 캐시가 없으면 백그라운드에서 로드 시작

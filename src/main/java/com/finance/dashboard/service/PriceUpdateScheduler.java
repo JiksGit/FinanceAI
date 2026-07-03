@@ -108,8 +108,9 @@ public class PriceUpdateScheduler {
 
                 String name = link.text().trim();
                 long close = parseLong(cells.get(2).text());
-                long change = parseChange(cells.get(3));
                 BigDecimal rate = parseBD(cells.get(4).text());
+                long changeAbs = parseLong(cells.get(3).text());
+                long change = rate.compareTo(BigDecimal.ZERO) < 0 ? -changeAbs : changeAbs;
                 long marketCap = parseLong(cells.get(6).text());
                 long volume = parseLong(cells.get(9).text());
 
