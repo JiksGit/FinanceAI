@@ -6,6 +6,7 @@ import SessionExpiredModal from './components/common/SessionExpiredModal'
 import HomePage from './pages/HomePage'
 import StockPage from './pages/StockPage'
 import StockDetailPage from './pages/StockDetailPage'
+import MetalDetailPage from './pages/MetalDetailPage'
 import SignalsPage from './pages/SignalsPage'
 import AiPage from './pages/AiPage'
 import LoginPage from './pages/LoginPage'
@@ -27,6 +28,7 @@ function App() {
           <Route path="/" element={<HomePage />} />
           <Route path="/stocks" element={<StockPage />} />
           <Route path="/stocks/:code" element={<StockDetailPage />} />
+          <Route path="/metals/:symbol" element={<MetalDetailPage />} />
           <Route path="/signals" element={<SignalsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route

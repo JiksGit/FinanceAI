@@ -1,9 +1,10 @@
 import { useEffect, useState, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { getMetalPrices } from '../../api/metalsApi'
 
 const METAL_ICON = { GOLD: '🥇', SILVER: '🥈' }
 
-function MetalCard({ metal, loading }) {
+function MetalCard({ metal, loading, onClick }) {
   if (loading) {
     return (
       <div className="flex-1 rounded-xl border border-slate-200 bg-white p-4 animate-pulse">
@@ -19,7 +20,10 @@ function MetalCard({ metal, loading }) {
   const changeColor = isUp ? 'text-red-500' : isDown ? 'text-blue-500' : 'text-slate-400'
 
   return (
-    <div className="flex-1 rounded-xl border border-slate-200 bg-white p-4">
+    <div
+      onClick={onClick}
+      className="flex-1 rounded-xl border border-slate-200 bg-white p-4 cursor-pointer hover:border-slate-300 hover:shadow-sm transition-all"
+    >
       <div className="flex items-center justify-between mb-1">
         <span className="text-xs font-semibold text-slate-500 flex items-center gap-1">
           {METAL_ICON[metal.name]} {metal.nameKr}
@@ -56,6 +60,7 @@ function MetalCard({ metal, loading }) {
 }
 
 export default function MetalsPriceWidget() {
+  const navigate = useNavigate()
   const [metals, setMetals] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
@@ -91,7 +96,12 @@ export default function MetalsPriceWidget() {
       </div>
       <div className="flex gap-3">
         {items.map((m, i) => (
-          <MetalCard key={m.name ?? i} metal={m} loading={loading} />
+          <MetalCard
+            key={m.name ?? i}
+            metal={m}
+            loading={loading}
+            onClick={() => !loading && navigate(`/metals/${m.name}`)}
+          />
         ))}
       </div>
     </div>
