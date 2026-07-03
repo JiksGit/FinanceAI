@@ -25,6 +25,9 @@ export default function Navbar() {
         <Link to="/signals" className="text-sm text-slate-600 hover:text-slate-900">
           시그널
         </Link>
+        <Link to="/correlation" className="text-sm text-slate-600 hover:text-slate-900">
+          상관관계
+        </Link>
         <Link to="/ai" className="text-sm text-slate-600 hover:text-slate-900">
           AI 분석
         </Link>

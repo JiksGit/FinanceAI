@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useExchangeRate } from '../hooks/useExchangeRate'
 import { getFavorites } from '../api/stockApi'
 import { getRecentSignals } from '../api/signalApi'
@@ -85,11 +85,14 @@ function SignalRow({ signal }) {
 }
 
 // ── 환율 뱃지 행 ──────────────────────────────────────────
-function ExchangeRow({ rate }) {
+function ExchangeRow({ rate, onClick }) {
   const isUp = rate.change > 0
   const isDown = rate.change < 0
   return (
-    <div className="flex items-center justify-between py-2.5">
+    <div
+      onClick={onClick}
+      className="flex items-center justify-between py-2.5 cursor-pointer hover:bg-slate-50 rounded px-1 -mx-1 transition-colors"
+    >
       <span className="text-sm font-medium text-slate-800">{rate.currency}</span>
       <div className="text-right">
         <span className="text-sm font-semibold text-slate-800">
@@ -110,6 +113,7 @@ function ExchangeRow({ rate }) {
 // ── 메인 대시보드 ──────────────────────────────────────────
 export default function HomePage() {
   const { isAuthenticated, nickname } = useAuth()
+  const navigate = useNavigate()
   const { data: exchangeData, loading: exchangeLoading } = useExchangeRate()
 
   const [favorites, setFavorites] = useState([])
@@ -335,7 +339,7 @@ export default function HomePage() {
                 <div key={i} className="h-12 animate-pulse rounded-lg bg-slate-100" />
               ))
             : topRates.map((rate) => (
-                <ExchangeRow key={rate.currency} rate={rate} />
+                <ExchangeRow key={rate.currency} rate={rate} onClick={() => navigate(`/exchange/${rate.currency}`)} />
               ))}
         </div>
 

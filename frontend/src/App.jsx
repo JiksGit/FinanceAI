@@ -7,6 +7,8 @@ import HomePage from './pages/HomePage'
 import StockPage from './pages/StockPage'
 import StockDetailPage from './pages/StockDetailPage'
 import MetalDetailPage from './pages/MetalDetailPage'
+import ExchangeDetailPage from './pages/ExchangeDetailPage'
+import CorrelationPage from './pages/CorrelationPage'
 import SignalsPage from './pages/SignalsPage'
 import AiPage from './pages/AiPage'
 import LoginPage from './pages/LoginPage'
@@ -29,6 +31,8 @@ function App() {
           <Route path="/stocks" element={<StockPage />} />
           <Route path="/stocks/:code" element={<StockDetailPage />} />
           <Route path="/metals/:symbol" element={<MetalDetailPage />} />
+          <Route path="/exchange/:currency" element={<ExchangeDetailPage />} />
+          <Route path="/correlation" element={<CorrelationPage />} />
           <Route path="/signals" element={<SignalsPage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route
