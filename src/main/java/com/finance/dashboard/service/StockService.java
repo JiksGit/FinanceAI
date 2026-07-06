@@ -183,6 +183,8 @@ public class StockService {
                 changeRate,
                 profitLoss,
                 profitLossRate,
+                fav.getTargetPrice(),
+                fav.getTargetAbove(),
                 fav.getCreatedAt()
         );
     }

@@ -13,6 +13,8 @@ public record FavoriteStockResponse(
         BigDecimal changeRate,
         BigDecimal profitLoss,
         BigDecimal profitLossRate,
+        BigDecimal targetPrice,
+        Boolean targetAbove,
         LocalDateTime createdAt
 ) {
 }

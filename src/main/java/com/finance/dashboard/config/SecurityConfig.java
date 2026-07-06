@@ -36,6 +36,7 @@ public class SecurityConfig {
                         .requestMatchers("/api/exchange/**").permitAll()
                         .requestMatchers("/api/metals/**").permitAll()
                         .requestMatchers("/api/correlation/**").permitAll()
+                        .requestMatchers("/api/alerts/**").authenticated()
                         .requestMatchers("/api/internal/**").authenticated()
                         .requestMatchers("/api/stock/favorites", "/api/stock/favorites/**").authenticated()
                         .requestMatchers("/api/stock/market/**",

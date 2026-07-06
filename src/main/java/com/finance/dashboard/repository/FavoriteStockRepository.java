@@ -19,4 +19,7 @@ public interface FavoriteStockRepository extends JpaRepository<FavoriteStock, Lo
 
     @Query("select distinct f.stockSymbol from FavoriteStock f")
     List<String> findDistinctStockSymbols();
+
+    @Query("select f from FavoriteStock f where f.targetPrice is not null")
+    List<FavoriteStock> findAllWithTargetPrice();
 }

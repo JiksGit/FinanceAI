@@ -38,6 +38,14 @@ public class FavoriteStock {
     @Column(name = "avg_price", precision = 15, scale = 2)
     private BigDecimal avgPrice;
 
+    /** 목표가. null이면 알림 미설정. */
+    @Column(name = "target_price", precision = 15, scale = 2)
+    private BigDecimal targetPrice;
+
+    /** 목표가 방향: true=이상(매도목표), false=이하(매수목표) */
+    @Column(name = "target_above")
+    private Boolean targetAbove;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -56,5 +64,10 @@ public class FavoriteStock {
     public void updateHolding(Integer quantity, BigDecimal avgPrice) {
         this.quantity = quantity;
         this.avgPrice = avgPrice;
+    }
+
+    public void updateTargetPrice(BigDecimal targetPrice, Boolean targetAbove) {
+        this.targetPrice = targetPrice;
+        this.targetAbove = targetAbove;
     }
 }

@@ -11,6 +11,7 @@ import {
   searchStock,
   updateHolding,
 } from '../api/stockApi'
+import { setTargetPrice, clearTargetPrice } from '../api/alertApi'
 import { useAuth } from '../hooks/useAuth'
 import MarketTopTable, { formatMarketCap, priceColor } from '../components/stock/MarketTopTable'
 import StockChart from '../components/stock/StockChart'
@@ -114,6 +115,201 @@ function HoldingEditor({ symbol, favorite, onSave, onClose }) {
           className="flex-1 rounded border border-slate-300 py-1 text-xs text-slate-600 hover:bg-slate-100">취소</button>
       </div>
     </div>
+  )
+}
+
+// ── 관심종목 상세 팝업 ────────────────────────────────────
+function FavoriteDetailModal({ fav, onClose, onSetTarget, onClearTarget, onRemove }) {
+  const hasHolding = fav.quantity > 0 && fav.avgPrice != null
+  const currentPrice = Number(fav.currentPrice ?? 0)
+  const avgPrice = Number(fav.avgPrice ?? 0)
+  const changeRate = Number(fav.changeRate ?? 0)
+  const priceChange = Number(fav.priceChange ?? 0)
+  const profitLoss = Number(fav.profitLoss ?? 0)
+  const profitLossRate = Number(fav.profitLossRate ?? 0)
+  const isUp = changeRate > 0
+  const isDown = changeRate < 0
+  const isProfit = profitLoss > 0
+  const isLoss = profitLoss < 0
+
+  const [showTarget, setShowTarget] = useState(false)
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+      onClick={onClose}>
+      <div className="w-80 rounded-2xl bg-white shadow-2xl p-5"
+        onClick={(e) => e.stopPropagation()}>
+
+        {/* 헤더 */}
+        <div className="flex items-start justify-between mb-4">
+          <div>
+            <h2 className="text-base font-bold text-slate-800">{fav.stockName}</h2>
+            <p className="text-xs text-slate-400 font-mono mt-0.5">{fav.stockSymbol}</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg leading-none">✕</button>
+        </div>
+
+        {/* 현재가 */}
+        {fav.currentPrice != null && (
+          <div className="rounded-xl bg-slate-50 p-3 mb-3">
+            <p className="text-xs text-slate-400 mb-1">현재가</p>
+            <p className="text-2xl font-bold text-slate-800">
+              ₩{currentPrice.toLocaleString('ko-KR')}
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <span className={`text-sm font-semibold ${isUp ? 'text-red-500' : isDown ? 'text-blue-500' : 'text-slate-400'}`}>
+                {isUp ? '▲' : isDown ? '▼' : '─'}
+                {' '}{Math.abs(priceChange).toLocaleString('ko-KR')}원
+              </span>
+              <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full ${
+                isUp ? 'bg-red-50 text-red-500' : isDown ? 'bg-blue-50 text-blue-500' : 'bg-slate-100 text-slate-400'
+              }`}>
+                {isUp ? '+' : ''}{changeRate.toFixed(2)}%
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* 보유 정보 */}
+        {hasHolding && (
+          <div className="rounded-xl border border-slate-100 p-3 mb-3">
+            <p className="text-xs font-semibold text-slate-500 mb-2">보유 현황</p>
+            <div className="grid grid-cols-2 gap-y-2 text-xs">
+              <div>
+                <p className="text-slate-400">보유 수량</p>
+                <p className="font-semibold text-slate-700 mt-0.5">{fav.quantity}주</p>
+              </div>
+              <div>
+                <p className="text-slate-400">평균 구입가</p>
+                <p className="font-semibold text-slate-700 mt-0.5">₩{avgPrice.toLocaleString('ko-KR')}</p>
+              </div>
+              <div>
+                <p className="text-slate-400">평가 손익</p>
+                <p className={`font-bold mt-0.5 ${isProfit ? 'text-red-500' : isLoss ? 'text-blue-500' : 'text-slate-400'}`}>
+                  {isProfit ? '+' : ''}{profitLoss.toLocaleString('ko-KR')}원
+                </p>
+              </div>
+              <div>
+                <p className="text-slate-400">수익률</p>
+                <p className={`font-bold mt-0.5 ${isProfit ? 'text-red-500' : isLoss ? 'text-blue-500' : 'text-slate-400'}`}>
+                  {isProfit ? '+' : ''}{profitLossRate.toFixed(2)}%
+                </p>
+              </div>
+              {fav.currentPrice != null && (
+                <>
+                  <div>
+                    <p className="text-slate-400">평가 금액</p>
+                    <p className="font-semibold text-slate-700 mt-0.5">
+                      ₩{(currentPrice * fav.quantity).toLocaleString('ko-KR')}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-slate-400">투자 원금</p>
+                    <p className="font-semibold text-slate-700 mt-0.5">
+                      ₩{(avgPrice * fav.quantity).toLocaleString('ko-KR')}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* 목표가 */}
+        <div className="rounded-xl border border-slate-100 p-3 mb-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-semibold text-slate-500">목표가 알림</p>
+            <button onClick={() => setShowTarget((v) => !v)}
+              className="text-xs text-indigo-500 hover:underline">
+              {fav.targetPrice ? '수정' : '설정'}
+            </button>
+          </div>
+          {fav.targetPrice && !showTarget ? (
+            <p className="text-xs text-indigo-600">
+              🎯 ₩{Number(fav.targetPrice).toLocaleString('ko-KR')} {fav.targetAbove ? '이상' : '이하'} 도달 시 알림
+            </p>
+          ) : showTarget ? (
+            <TargetEditorInline
+              fav={fav}
+              onSave={(sym, price, above) => { onSetTarget(sym, price, above); setShowTarget(false) }}
+              onClear={(sym) => { onClearTarget(sym); setShowTarget(false) }}
+              onCancel={() => setShowTarget(false)}
+            />
+          ) : (
+            <p className="text-xs text-slate-400">설정된 목표가가 없습니다</p>
+          )}
+        </div>
+
+        {/* 하단 버튼 */}
+        <div className="flex gap-2">
+          <button
+            onClick={onClose}
+            className="flex-1 rounded-lg border border-slate-200 py-2 text-xs text-slate-600 hover:bg-slate-50">
+            닫기
+          </button>
+          <button
+            onClick={() => { onRemove(fav.stockSymbol); onClose() }}
+            className="rounded-lg border border-red-100 px-3 py-2 text-xs text-red-400 hover:bg-red-50">
+            삭제
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function TargetEditorInline({ fav, onSave, onCancel, onClear }) {
+  const [price, setPrice] = useState(fav.targetPrice ?? '')
+  const [above, setAbove] = useState(fav.targetAbove ?? true)
+  return (
+    <div className="flex flex-col gap-1.5 mt-1">
+      <select value={above} onChange={(e) => setAbove(e.target.value === 'true')}
+        className="rounded border border-slate-300 px-2 py-1 text-xs">
+        <option value="true">이상 (매도목표)</option>
+        <option value="false">이하 (매수목표)</option>
+      </select>
+      <input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)}
+        placeholder="목표가 입력 (원)" className="rounded border border-slate-300 px-2 py-1 text-xs" />
+      <div className="flex gap-1.5">
+        <button onClick={() => { if (price) onSave(fav.stockSymbol, Number(price), above) }}
+          className="flex-1 rounded bg-indigo-600 py-1 text-xs text-white hover:bg-indigo-700">설정</button>
+        {fav.targetPrice && (
+          <button onClick={() => onClear(fav.stockSymbol)}
+            className="rounded border border-red-200 px-2 py-1 text-xs text-red-400 hover:bg-red-50">해제</button>
+        )}
+        <button onClick={onCancel}
+          className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-400 hover:bg-slate-50">취소</button>
+      </div>
+    </div>
+  )
+}
+
+// ── 목표가 설정 ───────────────────────────────────────────
+function TargetEditor({ fav, onSave, onCancel, onClear }) {
+  const [price, setPrice] = useState(fav.targetPrice ?? '')
+  const [above, setAbove] = useState(fav.targetAbove ?? true)
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (!price) return
+    onSave(fav.stockSymbol, Number(price), above)
+  }
+  return (
+    <form onSubmit={handleSubmit} onClick={(e) => e.stopPropagation()}
+      className="mt-2 flex items-center gap-1.5 flex-wrap">
+      <select value={above} onChange={(e) => setAbove(e.target.value === 'true')}
+        className="rounded border border-slate-300 px-1.5 py-1 text-xs">
+        <option value="true">이상 (매도목표)</option>
+        <option value="false">이하 (매수목표)</option>
+      </select>
+      <input type="number" min="0" value={price} onChange={(e) => setPrice(e.target.value)}
+        placeholder="목표가 (원)" className="w-28 rounded border border-slate-300 px-1.5 py-1 text-xs" />
+      <button type="submit" className="text-xs text-indigo-600 hover:underline">설정</button>
+      {fav.targetPrice && (
+        <button type="button" onClick={() => onClear(fav.stockSymbol)}
+          className="text-xs text-red-400 hover:underline">해제</button>
+      )}
+      <button type="button" onClick={onCancel} className="text-xs text-slate-400 hover:underline">취소</button>
+    </form>
   )
 }
 
@@ -315,6 +511,8 @@ export default function StockPage() {
   const [favorites, setFavorites] = useState([])
   const [portfolioSummary, setPortfolioSummary] = useState(null)
   const [activeTab, setActiveTab] = useState('market') // 'market' | 'portfolio'
+  const [targetSymbol, setTargetSymbol] = useState(null)
+  const [detailFav, setDetailFav] = useState(null)
 
   const loadFavorites = () => {
     if (!isAuthenticated) return
@@ -337,7 +535,16 @@ export default function StockPage() {
     try { await updateHolding(symbol, qty, avg); loadFavorites() } catch {}
   }
 
+  const handleSetTarget = async (symbol, price, above) => {
+    try { await setTargetPrice(symbol, price, above); loadFavorites(); setTargetSymbol(null) } catch {}
+  }
+
+  const handleClearTarget = async (symbol) => {
+    try { await clearTargetPrice(symbol); loadFavorites(); setTargetSymbol(null) } catch {}
+  }
+
   return (
+    <>
     <div className="flex h-[calc(100vh-120px)] min-h-[600px] gap-4">
       {/* ── 왼쪽 패널 ── */}
       <div className="flex w-80 shrink-0 flex-col gap-3 lg:w-96">
@@ -383,36 +590,53 @@ export default function StockPage() {
               ) : (
                 <div className="space-y-0">
                   {favorites.map((fav) => {
-                    const change = fav.profitLoss
                     const isSelected = selectedCode === fav.stockSymbol
+                    const hasTarget = fav.targetPrice != null
+                    const changeRate = Number(fav.changeRate ?? 0)
                     return (
                       <div
                         key={fav.stockSymbol}
-                        onClick={() => setSelectedCode(fav.stockSymbol)}
-                        className={`cursor-pointer rounded-lg p-2.5 transition-colors ${
+                        className={`rounded-lg p-2.5 transition-colors ${
                           isSelected ? 'bg-indigo-50' : 'hover:bg-slate-50'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <div>
-                            <p className="text-sm font-medium text-slate-800">{fav.stockName}</p>
+                          {/* 종목명 클릭 → 상세 팝업 */}
+                          <button
+                            className="flex-1 text-left"
+                            onClick={() => setDetailFav(fav)}
+                          >
+                            <p className="text-sm font-medium text-slate-800 hover:text-indigo-600">
+                              {fav.stockName}
+                              {hasTarget && <span className="ml-1 text-xs text-indigo-400">🎯</span>}
+                            </p>
                             <p className="text-xs text-slate-400 font-mono">{fav.stockSymbol}</p>
-                          </div>
-                          {fav.currentPrice && (
-                            <div className="text-right">
-                              <p className="text-sm font-semibold text-slate-800">
-                                ₩{Number(fav.currentPrice).toLocaleString('ko-KR')}
-                              </p>
-                              {fav.profitLossRate != null && (
-                                <p className={`text-xs font-medium ${
-                                  fav.profitLossRate >= 0 ? 'text-red-500' : 'text-blue-500'
-                                }`}>
-                                  {fav.profitLossRate >= 0 ? '+' : ''}
-                                  {Number(fav.profitLossRate).toFixed(2)}%
+                          </button>
+
+                          <div className="flex items-center gap-2">
+                            {fav.currentPrice && (
+                              <div className="text-right">
+                                <p className="text-sm font-semibold text-slate-800">
+                                  ₩{Number(fav.currentPrice).toLocaleString('ko-KR')}
                                 </p>
-                              )}
-                            </div>
-                          )}
+                                {fav.changeRate != null && (
+                                  <p className={`text-xs font-medium ${
+                                    changeRate > 0 ? 'text-red-500' : changeRate < 0 ? 'text-blue-500' : 'text-slate-400'
+                                  }`}>
+                                    {changeRate > 0 ? '+' : ''}{changeRate.toFixed(2)}%
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            {/* 차트 보기 버튼 */}
+                            <button
+                              onClick={() => setSelectedCode(fav.stockSymbol)}
+                              className="text-xs text-slate-300 hover:text-indigo-500 px-1"
+                              title="차트 보기"
+                            >
+                              📈
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )
@@ -426,12 +650,27 @@ export default function StockPage() {
 
       {/* ── 오른쪽 상세 패널 ── */}
       <div className="flex-1 overflow-y-auto rounded-xl border border-slate-200 bg-white p-4">
-        {activeTab === 'portfolio' && isAuthenticated && portfolioSummary?.totalCurrentValue > 0 && !selectedCode ? (
-          <div>
-            <h3 className="mb-4 text-sm font-semibold text-slate-700">포트폴리오 비중</h3>
-            <PortfolioPieChart summary={portfolioSummary} />
+        {/* 관심종목 탭일 때 포트폴리오 요약 항상 상단 표시 */}
+        {activeTab === 'portfolio' && isAuthenticated && portfolioSummary?.totalCurrentValue > 0 && (
+          <div className="mb-4">
+            <div className="flex items-center justify-between mb-2">
+              <h3 className="text-sm font-semibold text-slate-700">포트폴리오 비중</h3>
+              {selectedCode && (
+                <button onClick={() => setSelectedCode(null)}
+                  className="text-xs text-slate-400 hover:text-slate-600">← 차트 닫기</button>
+              )}
+            </div>
+            {!selectedCode && <PortfolioPieChart summary={portfolioSummary} />}
+            {!selectedCode && (
+              <p className="mt-3 text-center text-xs text-slate-400">
+                종목 옆 📈 버튼을 클릭하면 차트를 볼 수 있습니다
+              </p>
+            )}
           </div>
-        ) : (
+        )}
+
+        {/* 종목 선택 시 차트 패널 */}
+        {(activeTab === 'market' || selectedCode) && (
           <StockDetailPanel
             symbol={selectedCode}
             favorites={favorites}
@@ -440,7 +679,33 @@ export default function StockPage() {
             onUpdateHolding={handleUpdateHolding}
           />
         )}
+
+        {/* 관심종목 탭 + 포트폴리오 없음 + 종목 미선택 */}
+        {activeTab === 'portfolio' && !selectedCode && !(portfolioSummary?.totalCurrentValue > 0) && (
+          <div className="flex h-full flex-col items-center justify-center text-slate-400">
+            <p className="text-sm">종목을 선택하면 차트가 표시됩니다</p>
+            <p className="text-xs mt-1">종목 옆 📈 버튼을 클릭해보세요</p>
+          </div>
+        )}
       </div>
     </div>
+
+    {/* ── 관심종목 상세 팝업 ── */}
+    {detailFav && (
+      <FavoriteDetailModal
+        fav={detailFav}
+        onClose={() => setDetailFav(null)}
+        onSetTarget={async (sym, price, above) => {
+          await handleSetTarget(sym, price, above)
+          setDetailFav((prev) => prev ? { ...prev, targetPrice: price, targetAbove: above } : null)
+        }}
+        onClearTarget={async (sym) => {
+          await handleClearTarget(sym)
+          setDetailFav((prev) => prev ? { ...prev, targetPrice: null, targetAbove: null } : null)
+        }}
+        onRemove={(sym) => { removeFavorite(sym).then(loadFavorites).catch(() => {}); setDetailFav(null) }}
+      />
+    )}
+    </>
   )
 }
