@@ -144,7 +144,17 @@ function FavoriteDetailModal({ fav, onClose, onSetTarget, onClearTarget, onRemov
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-base font-bold text-slate-800">{fav.stockName}</h2>
-            <p className="text-xs text-slate-400 font-mono mt-0.5">{fav.stockSymbol}</p>
+            <div className="flex items-center gap-2 mt-0.5">
+              <p className="text-xs text-slate-400 font-mono">{fav.stockSymbol}</p>
+              <a
+                href={`https://m.stock.naver.com/domestic/stock/${fav.stockSymbol}/overview`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-indigo-500 hover:text-indigo-700 hover:underline"
+              >
+                네이버 →
+              </a>
+            </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-600 text-lg leading-none">✕</button>
         </div>
