@@ -14,7 +14,7 @@ spring:
     open-in-view: false
 
 cors:
-  allowed-origins: http://finance-ai-frontend.s3-website.ap-northeast-2.amazonaws.com
+  allowed-origins: http://finance-ai-frontend.s3-website.ap-northeast-2.amazonaws.com,https://d17mchdxg3nzdu.cloudfront.net
 
 logging:
   level:
