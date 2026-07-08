@@ -2,20 +2,25 @@ package com.finance.dashboard.service;
 
 import com.finance.dashboard.config.SignalConfig;
 import com.finance.dashboard.entity.StockSignal;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.stereotype.Service;
 
+import java.util.Optional;
+
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EmailService {
 
     private final JavaMailSender mailSender;
     private final SignalConfig signalConfig;
+
+    public EmailService(Optional<JavaMailSender> mailSender, SignalConfig signalConfig) {
+        this.mailSender = mailSender.orElse(null);
+        this.signalConfig = signalConfig;
+    }
 
     public void sendSignalAlert(String toEmail, StockSignal signal) {
         if (!signalConfig.mailEnabled()) {
