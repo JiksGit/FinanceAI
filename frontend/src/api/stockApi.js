@@ -8,7 +8,7 @@ export const getStock = (symbol) => api.get(`/stock/${symbol}`).then((res) => re
 export const getStockHistory = (symbol, days = 30) =>
   api.get(`/stock/${symbol}/history`, { params: { days } }).then((res) => res.data)
 
-export const getFavorites = () => api.get('/stock/favorites').then((res) => res.data)
+export const getFavorites = () => api.get('/stock/favorites').then((res) => Array.isArray(res.data) ? res.data : [])
 
 export const addFavorite = (symbol, name) =>
   api.post('/stock/favorites', { stockSymbol: symbol, stockName: name }).then((res) => res.data)

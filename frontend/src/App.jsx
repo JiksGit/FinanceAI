@@ -27,7 +27,7 @@ function App() {
       <Navbar />
       <main className="mx-auto max-w-6xl px-6 py-8">
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          <Route path="/" element={<ProtectedRoute><HomePage /></ProtectedRoute>} />
           <Route path="/stocks" element={<StockPage />} />
           <Route path="/stocks/:code" element={<StockDetailPage />} />
           <Route path="/metals/:symbol" element={<MetalDetailPage />} />
