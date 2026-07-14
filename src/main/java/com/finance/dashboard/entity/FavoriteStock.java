@@ -46,6 +46,10 @@ public class FavoriteStock {
     @Column(name = "target_above")
     private Boolean targetAbove;
 
+    /** 투자 메모. null이면 미작성. */
+    @Column(name = "memo", length = 500)
+    private String memo;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -69,5 +73,9 @@ public class FavoriteStock {
     public void updateTargetPrice(BigDecimal targetPrice, Boolean targetAbove) {
         this.targetPrice = targetPrice;
         this.targetAbove = targetAbove;
+    }
+
+    public void updateMemo(String memo) {
+        this.memo = memo;
     }
 }

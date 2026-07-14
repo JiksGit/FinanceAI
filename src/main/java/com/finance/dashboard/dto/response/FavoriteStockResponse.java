@@ -15,6 +15,7 @@ public record FavoriteStockResponse(
         BigDecimal profitLossRate,
         BigDecimal targetPrice,
         Boolean targetAbove,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String memo
 ) {
 }

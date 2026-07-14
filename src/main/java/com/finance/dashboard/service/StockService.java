@@ -2,6 +2,7 @@ package com.finance.dashboard.service;
 
 import com.finance.dashboard.dto.request.FavoriteStockRequest;
 import com.finance.dashboard.dto.request.UpdateHoldingRequest;
+import com.finance.dashboard.dto.request.UpdateMemoRequest;
 import com.finance.dashboard.dto.response.*;
 import com.finance.dashboard.entity.FavoriteStock;
 import com.finance.dashboard.entity.KrxDailyPrice;
@@ -185,7 +186,8 @@ public class StockService {
                 profitLossRate,
                 fav.getTargetPrice(),
                 fav.getTargetAbove(),
-                fav.getCreatedAt()
+                fav.getCreatedAt(),
+                fav.getMemo()
         );
     }
 
@@ -273,5 +275,13 @@ public class StockService {
                 .findByUserIdAndStockSymbol(userId, stockCode.toUpperCase())
                 .orElseThrow(() -> new CustomException(ErrorCode.STOCK_NOT_FOUND));
         favorite.updateHolding(request.quantity(), request.avgPrice());
+    }
+
+    @Transactional
+    public void updateMemo(Long userId, String stockCode, UpdateMemoRequest request) {
+        FavoriteStock favorite = favoriteStockRepository
+                .findByUserIdAndStockSymbol(userId, stockCode.toUpperCase())
+                .orElseThrow(() -> new CustomException(ErrorCode.STOCK_NOT_FOUND));
+        favorite.updateMemo(request.memo());
     }
 }

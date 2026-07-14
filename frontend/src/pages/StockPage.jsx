@@ -10,6 +10,7 @@ import {
   removeFavorite,
   searchStock,
   updateHolding,
+  updateMemo,
 } from '../api/stockApi'
 import { setTargetPrice, clearTargetPrice } from '../api/alertApi'
 import { useAuth } from '../hooks/useAuth'
@@ -119,7 +120,7 @@ function HoldingEditor({ symbol, favorite, onSave, onClose }) {
 }
 
 // ── 관심종목 상세 팝업 ────────────────────────────────────
-function FavoriteDetailModal({ fav, onClose, onSetTarget, onClearTarget, onRemove }) {
+function FavoriteDetailModal({ fav, onClose, onSetTarget, onClearTarget, onRemove, onUpdateMemo }) {
   const hasHolding = fav.quantity > 0 && fav.avgPrice != null
   const currentPrice = Number(fav.currentPrice ?? 0)
   const avgPrice = Number(fav.avgPrice ?? 0)
@@ -133,6 +134,19 @@ function FavoriteDetailModal({ fav, onClose, onSetTarget, onClearTarget, onRemov
   const isLoss = profitLoss < 0
 
   const [showTarget, setShowTarget] = useState(false)
+  const [memo, setMemo] = useState(fav.memo ?? '')
+  const [memoEditing, setMemoEditing] = useState(false)
+  const [memoSaving, setMemoSaving] = useState(false)
+
+  const handleMemoSave = async () => {
+    setMemoSaving(true)
+    try {
+      await onUpdateMemo(fav.stockSymbol, memo)
+      setMemoEditing(false)
+    } finally {
+      setMemoSaving(false)
+    }
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
@@ -247,6 +261,46 @@ function FavoriteDetailModal({ fav, onClose, onSetTarget, onClearTarget, onRemov
             />
           ) : (
             <p className="text-xs text-slate-400">설정된 목표가가 없습니다</p>
+          )}
+        </div>
+
+        {/* 투자 메모 */}
+        <div className="rounded-xl border border-slate-100 p-3 mb-4">
+          <div className="flex items-center justify-between mb-1.5">
+            <p className="text-xs font-semibold text-slate-500">투자 메모</p>
+            {!memoEditing && (
+              <button onClick={() => setMemoEditing(true)}
+                className="text-xs text-indigo-500 hover:underline">
+                {memo ? '수정' : '작성'}
+              </button>
+            )}
+          </div>
+          {memoEditing ? (
+            <div className="flex flex-col gap-1.5">
+              <textarea
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
+                maxLength={500}
+                rows={3}
+                placeholder="투자 이유, 목표, 참고사항 등을 메모하세요"
+                className="w-full rounded border border-slate-300 px-2 py-1.5 text-xs resize-none focus:outline-none focus:border-indigo-400"
+              />
+              <p className="text-right text-xs text-slate-300">{memo.length}/500</p>
+              <div className="flex gap-1.5">
+                <button onClick={handleMemoSave} disabled={memoSaving}
+                  className="flex-1 rounded bg-indigo-600 py-1 text-xs text-white hover:bg-indigo-700 disabled:opacity-50">
+                  {memoSaving ? '저장 중...' : '저장'}
+                </button>
+                <button onClick={() => { setMemo(fav.memo ?? ''); setMemoEditing(false) }}
+                  className="rounded border border-slate-200 px-2 py-1 text-xs text-slate-400 hover:bg-slate-50">
+                  취소
+                </button>
+              </div>
+            </div>
+          ) : memo ? (
+            <p className="text-xs text-slate-600 whitespace-pre-wrap leading-relaxed">{memo}</p>
+          ) : (
+            <p className="text-xs text-slate-400">메모가 없습니다</p>
           )}
         </div>
 
@@ -714,6 +768,11 @@ export default function StockPage() {
           setDetailFav((prev) => prev ? { ...prev, targetPrice: null, targetAbove: null } : null)
         }}
         onRemove={(sym) => { removeFavorite(sym).then(loadFavorites).catch(() => {}); setDetailFav(null) }}
+        onUpdateMemo={async (sym, memo) => {
+          await updateMemo(sym, memo)
+          setDetailFav((prev) => prev ? { ...prev, memo } : null)
+          loadFavorites()
+        }}
       />
     )}
     </>

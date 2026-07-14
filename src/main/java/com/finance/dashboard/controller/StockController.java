@@ -2,6 +2,7 @@ package com.finance.dashboard.controller;
 
 import com.finance.dashboard.dto.request.FavoriteStockRequest;
 import com.finance.dashboard.dto.request.UpdateHoldingRequest;
+import com.finance.dashboard.dto.request.UpdateMemoRequest;
 import com.finance.dashboard.dto.response.FavoriteStockResponse;
 import com.finance.dashboard.dto.response.NewsResponse;
 import com.finance.dashboard.dto.response.PortfolioSummaryResponse;
@@ -61,6 +62,16 @@ public class StockController {
             @Valid @RequestBody UpdateHoldingRequest request
     ) {
         stockService.updateHolding(principal.getUserId(), symbol, request);
+        return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/favorites/{symbol}/memo")
+    public ResponseEntity<Void> updateMemo(
+            @AuthenticationPrincipal UserPrincipal principal,
+            @PathVariable String symbol,
+            @Valid @RequestBody UpdateMemoRequest request
+    ) {
+        stockService.updateMemo(principal.getUserId(), symbol, request);
         return ResponseEntity.ok().build();
     }
 

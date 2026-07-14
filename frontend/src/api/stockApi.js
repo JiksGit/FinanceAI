@@ -18,6 +18,9 @@ export const removeFavorite = (symbol) => api.delete(`/stock/favorites/${symbol}
 export const updateHolding = (symbol, quantity, avgPrice) =>
   api.put(`/stock/favorites/${symbol}/holding`, { quantity, avgPrice })
 
+export const updateMemo = (symbol, memo) =>
+  api.patch(`/stock/favorites/${symbol}/memo`, { memo })
+
 export const getPortfolioSummary = () =>
   api.get('/stock/portfolio/summary').then((res) => res.data)
 
