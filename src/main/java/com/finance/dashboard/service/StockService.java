@@ -3,6 +3,7 @@ package com.finance.dashboard.service;
 import com.finance.dashboard.dto.request.FavoriteStockRequest;
 import com.finance.dashboard.dto.request.UpdateHoldingRequest;
 import com.finance.dashboard.dto.request.UpdateMemoRequest;
+import com.finance.dashboard.dto.response.SectorBreakdownResponse;
 import com.finance.dashboard.dto.response.*;
 import com.finance.dashboard.entity.FavoriteStock;
 import com.finance.dashboard.entity.KrxDailyPrice;
@@ -20,6 +21,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Slf4j
@@ -275,6 +277,32 @@ public class StockService {
                 .findByUserIdAndStockSymbol(userId, stockCode.toUpperCase())
                 .orElseThrow(() -> new CustomException(ErrorCode.STOCK_NOT_FOUND));
         favorite.updateHolding(request.quantity(), request.avgPrice());
+    }
+
+    public SectorBreakdownResponse getSectorBreakdown(Long userId) {
+        List<FavoriteStock> favorites = favoriteStockRepository.findByUserIdOrderByCreatedAtDesc(userId);
+        int total = favorites.size();
+        if (total == 0) return new SectorBreakdownResponse(List.of());
+
+        Map<String, Long> countBySector = favorites.stream()
+                .collect(java.util.stream.Collectors.groupingBy(
+                        fav -> {
+                            KrxStockInfo info = stockInfoRepository.findById(fav.getStockSymbol()).orElse(null);
+                            return (info != null && info.getSector() != null) ? info.getSector() : "기타";
+                        },
+                        java.util.stream.Collectors.counting()
+                ));
+
+        List<SectorBreakdownResponse.SectorItem> items = countBySector.entrySet().stream()
+                .sorted((a, b) -> Long.compare(b.getValue(), a.getValue()))
+                .map(e -> new SectorBreakdownResponse.SectorItem(
+                        e.getKey(),
+                        e.getValue().intValue(),
+                        Math.round(e.getValue() * 1000.0 / total) / 10.0
+                ))
+                .toList();
+
+        return new SectorBreakdownResponse(items);
     }
 
     @Transactional

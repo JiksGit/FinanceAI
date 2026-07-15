@@ -4,6 +4,7 @@ import {
   addFavorite,
   getFavorites,
   getPortfolioSummary,
+  getSectorBreakdown,
   getStock,
   getStockHistory,
   getStockNews,
@@ -577,11 +578,13 @@ export default function StockPage() {
   const [activeTab, setActiveTab] = useState('market') // 'market' | 'portfolio'
   const [targetSymbol, setTargetSymbol] = useState(null)
   const [detailFav, setDetailFav] = useState(null)
+  const [sectorBreakdown, setSectorBreakdown] = useState(null)
 
   const loadFavorites = () => {
     if (!isAuthenticated) return
     getFavorites().then(setFavorites).catch(() => {})
     getPortfolioSummary().then(setPortfolioSummary).catch(() => {})
+    getSectorBreakdown().then(setSectorBreakdown).catch(() => {})
   }
 
   useEffect(loadFavorites, [isAuthenticated])
@@ -730,6 +733,29 @@ export default function StockPage() {
                 종목 옆 📈 버튼을 클릭하면 차트를 볼 수 있습니다
               </p>
             )}
+          </div>
+        )}
+
+        {/* 섹터 분석 */}
+        {activeTab === 'portfolio' && isAuthenticated && !selectedCode && sectorBreakdown?.sectors?.length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-semibold text-slate-700 mb-2">섹터 분석</h3>
+            <div className="rounded-xl border border-slate-100 p-3 space-y-2">
+              {sectorBreakdown.sectors.map((item) => (
+                <div key={item.sector}>
+                  <div className="flex justify-between text-xs mb-1">
+                    <span className="text-slate-600 font-medium">{item.sector}</span>
+                    <span className="text-slate-400">{item.stockCount}종목 · {item.percentage}%</span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-slate-100">
+                    <div
+                      className="h-1.5 rounded-full bg-indigo-400 transition-all"
+                      style={{ width: `${item.percentage}%` }}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

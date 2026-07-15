@@ -6,6 +6,7 @@ import com.finance.dashboard.dto.request.UpdateMemoRequest;
 import com.finance.dashboard.dto.response.FavoriteStockResponse;
 import com.finance.dashboard.dto.response.NewsResponse;
 import com.finance.dashboard.dto.response.PortfolioSummaryResponse;
+import com.finance.dashboard.dto.response.SectorBreakdownResponse;
 import com.finance.dashboard.dto.response.StockHistoryResponse;
 import com.finance.dashboard.dto.response.StockResponse;
 import com.finance.dashboard.dto.response.StockSearchResult;
@@ -44,6 +45,11 @@ public class StockController {
     @GetMapping("/portfolio/summary")
     public PortfolioSummaryResponse getPortfolioSummary(@AuthenticationPrincipal UserPrincipal principal) {
         return stockService.getPortfolioSummary(principal.getUserId());
+    }
+
+    @GetMapping("/portfolio/sector-breakdown")
+    public SectorBreakdownResponse getSectorBreakdown(@AuthenticationPrincipal UserPrincipal principal) {
+        return stockService.getSectorBreakdown(principal.getUserId());
     }
 
     @PostMapping("/favorites")

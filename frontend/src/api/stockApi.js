@@ -35,3 +35,6 @@ export const getStockDetail = (symbol) =>
 
 export const getMarketIndices = () =>
   api.get('/stock/market/indices').then((res) => res.data)
+
+export const getSectorBreakdown = () =>
+  api.get('/stock/portfolio/sector-breakdown').then((res) => res.data)
