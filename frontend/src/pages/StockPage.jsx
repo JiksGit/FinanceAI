@@ -53,11 +53,11 @@ function SearchBar({ onSelect }) {
     } catch { setResults([]) }
   }
 
-  const handlePick = (symbol) => {
+  const handlePick = (symbol, name) => {
     setKeyword('')
     setResults([])
     setOpen(false)
-    onSelect(symbol)
+    onSelect(symbol, name)
   }
 
   return (
@@ -78,7 +78,7 @@ function SearchBar({ onSelect }) {
           {results.slice(0, 10).map((r) => (
             <button
               key={r.symbol}
-              onClick={() => handlePick(r.symbol)}
+              onClick={() => handlePick(r.symbol, r.name)}
               className="flex w-full items-center justify-between px-4 py-2.5 text-left hover:bg-slate-50"
             >
               <span className="font-medium text-slate-800 text-sm">{r.name}</span>
@@ -579,6 +579,9 @@ export default function StockPage() {
   const [targetSymbol, setTargetSymbol] = useState(null)
   const [detailFav, setDetailFav] = useState(null)
   const [sectorBreakdown, setSectorBreakdown] = useState(null)
+  const [recentStocks, setRecentStocks] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('recentStocks') || '[]') } catch { return [] }
+  })
 
   const loadFavorites = () => {
     if (!isAuthenticated) return
@@ -588,6 +591,28 @@ export default function StockPage() {
   }
 
   useEffect(loadFavorites, [isAuthenticated])
+
+  const addToRecent = (symbol, name) => {
+    setRecentStocks((prev) => {
+      const filtered = prev.filter((s) => s.symbol !== symbol)
+      const next = [{ symbol, name, viewedAt: Date.now() }, ...filtered].slice(0, 10)
+      localStorage.setItem('recentStocks', JSON.stringify(next))
+      return next
+    })
+  }
+
+  const removeRecent = (symbol) => {
+    setRecentStocks((prev) => {
+      const next = prev.filter((s) => s.symbol !== symbol)
+      localStorage.setItem('recentStocks', JSON.stringify(next))
+      return next
+    })
+  }
+
+  const handleSelectStock = (symbol, name) => {
+    setSelectedCode(symbol)
+    if (symbol && name) addToRecent(symbol, name)
+  }
 
   const handleFavoriteToggle = async (symbol) => {
     const isFav = favorites.some((f) => f.stockSymbol === symbol)
@@ -616,7 +641,7 @@ export default function StockPage() {
       {/* ── 왼쪽 패널 ── */}
       <div className="flex w-80 shrink-0 flex-col gap-3 lg:w-96">
         {/* 검색 */}
-        <SearchBar onSelect={setSelectedCode} />
+        <SearchBar onSelect={(symbol, name) => handleSelectStock(symbol, name)} />
 
         {/* 탭 */}
         <div className="flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
@@ -697,7 +722,7 @@ export default function StockPage() {
                             )}
                             {/* 차트 보기 버튼 */}
                             <button
-                              onClick={() => setSelectedCode(fav.stockSymbol)}
+                              onClick={() => handleSelectStock(fav.stockSymbol, fav.stockName)}
                               className="text-xs text-slate-300 hover:text-indigo-500 px-1"
                               title="차트 보기"
                             >
@@ -713,6 +738,40 @@ export default function StockPage() {
             </div>
           )}
         </div>
+
+        {/* 최근 본 종목 */}
+        {recentStocks.length > 0 && (
+          <div className="mt-3 rounded-xl border border-slate-200 bg-white p-3">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-xs font-semibold text-slate-500">최근 본 종목</p>
+              <button
+                onClick={() => { localStorage.removeItem('recentStocks'); setRecentStocks([]) }}
+                className="text-xs text-slate-300 hover:text-slate-500"
+              >
+                전체 삭제
+              </button>
+            </div>
+            <div className="space-y-1">
+              {recentStocks.map((s) => (
+                <div key={s.symbol} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-slate-50">
+                  <button
+                    className="flex-1 text-left"
+                    onClick={() => handleSelectStock(s.symbol, s.name)}
+                  >
+                    <span className="text-xs font-medium text-slate-700">{s.name}</span>
+                    <span className="ml-2 font-mono text-xs text-slate-400">{s.symbol}</span>
+                  </button>
+                  <button
+                    onClick={() => removeRecent(s.symbol)}
+                    className="ml-2 text-slate-200 hover:text-slate-400 text-xs"
+                  >
+                    ✕
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ── 오른쪽 상세 패널 ── */}
