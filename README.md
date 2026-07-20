@@ -1,170 +1,214 @@
-# AI Finance Dashboard
+# FinanceAI
 
-실시간 환율·주식 데이터를 시각화하고, 기술적 지표 기반 매매 시그널을 AI가 해설해주는 금융 대시보드입니다.
+Spring Boot 3.5 + React 기반 주식/금융 대시보드 프로젝트.  
+AWS SAA(Solutions Architect Associate) 자격증 학습을 목적으로 실제 인프라 구성 및 배포까지 진행한 풀스택 사이드 프로젝트.
 
-> **참고**: 초기 기획은 "주식 자동매수" 프로젝트였으나, 실거래 자동 실행은 책임 소재·인가받지 않은 투자자문 등의 문제로 범위에서 제외하고 **시그널 알림 + 포트폴리오 트래커**로 방향을 잡았습니다. 매수/매도 시그널은 정보 제공 목적이며, 실제 주문은 사용자가 직접 증권사를 통해 수행합니다.
+> 매수/매도 시그널은 정보 제공 목적이며, 실제 주문은 사용자가 직접 증권사를 통해 수행합니다.
 
 ---
 
-## 핵심 기능
+## 라이브 데모
 
-| 영역 | 설명 |
-|------|------|
-| **환율 대시보드** | 한국수출입은행 API 연동, USD/JPY/EUR/CNY 실시간 환율 + 30일 추이 차트. DB 캐싱으로 API 호출 최소화(휴일은 캐시로 스킵) |
-| **주식 조회** | Alpha Vantage 연동(무료 플랜 25건/일 한도 대응 Mock 모드 지원), 종목 검색·실시간 시세·히스토리 차트 |
-| **포트폴리오 트래커** | 즐겨찾기 종목에 보유 수량/평단가를 입력하면 현재가 대비 손익(P/L)을 자동 계산 |
-| **매매 시그널** | 5일/20일 이동평균선 골든크로스·데드크로스를 평일 매일 자동 탐지. 사용자들이 즐겨찾기한 종목을 기준으로 추적 대상이 동적으로 결정됨 |
-| **AI 분석** | GPT가 환율/포트폴리오 실시간 데이터를 context로 받아 자연어 질의응답. 시그널 발생 시에도 GPT가 그 의미를 해설(키 미설정 시 규칙 기반 설명으로 자동 폴백) |
-| **이메일 알림** | 관심 종목에 매매 시그널이 발생하면 구독 중인 사용자에게 메일 발송 |
-| **인증** | JWT 기반 회원가입/로그인/리프레시 토큰 |
+**URL:** https://d17mchdxg3nzdu.cloudfront.net
 
 ---
 
 ## 기술 스택
 
-### Backend
-- **Spring Boot 3.5** (Java 17)
-- **Spring Security + JWT** (jjwt) — Stateless 인증
-- **Spring Data JPA / Hibernate** — MySQL 8
-- **Spring Mail** — 시그널 이메일 알림
-- **RestClient** — 외부 API 연동 (한국수출입은행, Alpha Vantage, OpenAI)
-- **Spring Scheduling** — 매매 시그널 일일 자동 생성
-
-### Frontend
-- **React 19 + Vite**
-- **TailwindCSS v4**
-- **Recharts** — 환율/주식 차트
-- **Zustand** — 인증 토큰 상태 관리
-- **Axios** — JWT 자동 주입 + 401 시 토큰 자동 갱신 인터셉터
-- **React Router**
-
-### Infra
-- **Docker / Docker Compose** — MySQL + Backend + Frontend(Nginx) 전체 스택을 컨테이너로 기동
-- **Nginx** — 정적 파일 서빙 + `/api` 리버스 프록시
-
-### 외부 API
-- [한국수출입은행 환율 API](https://oapi.koreaexim.go.kr) (무료, 1,000건/일)
-- [Alpha Vantage](https://www.alphavantage.co) 주식 API (무료, 25건/일 — 개발 중엔 Mock 데이터 사용)
-- [OpenAI](https://platform.openai.com) GPT (gpt-4o-mini)
+| 구분 | 기술 |
+|---|---|
+| Backend | Java 21, Spring Boot 3.5, Spring Security, JPA, JWT, WebSocket |
+| Frontend | React 18, Vite, Tailwind CSS, Recharts, React Router |
+| Database | MySQL 8 (AWS RDS) |
+| Infra | AWS VPC · EC2 · RDS · S3 · CloudFront · ALB |
+| CI/CD | GitHub Actions (Gradle 빌드 → SCP → SSH 재시작) |
+| 부하테스트 | k6 |
 
 ---
 
-## 시스템 아키텍처
+## AWS 아키텍처
 
 ```
-[React (Vite)] ── Axios ──▶ [Nginx] ── /api/* ──▶ [Spring Boot] ──▶ [MySQL]
-                                │                        │
-                                │                        ├──▶ 한국수출입은행 API
-                                │                        ├──▶ Alpha Vantage API (or Mock)
-                                │                        ├──▶ OpenAI API
-                                └── 정적 파일 서빙              └──▶ SMTP (시그널 알림 메일)
+사용자
+  ↓ HTTPS
+CloudFront (d17mchdxg3nzdu.cloudfront.net)
+  ├── /api/*  → ALB → EC2 t2.micro (Spring Boot :8080) → RDS MySQL
+  └── /*      → S3 (React 정적 파일)
 ```
 
----
+### 구성 요소
 
-## 디렉토리 구조
+| 서비스 | 이름 | 비고 |
+|---|---|---|
+| VPC | finance-ai-vpc | 서울 리전 (ap-northeast-2) |
+| EC2 | finance-ai-server | t2.micro, systemd 등록 |
+| RDS | finance-ai-db | db.t3.micro, MySQL 8, 단일 AZ |
+| S3 | finance-ai-frontend | 정적 웹 호스팅 |
+| CloudFront | d17mchdxg3nzdu.cloudfront.net | S3 + ALB 멀티 오리진 |
+| ALB | finance-ai-alb | HTTP:80, 대상그룹 :8080 |
+
+### 보안 그룹
 
 ```
-.
-├── src/main/java/com/finance/dashboard/
-│   ├── config/        # Security, JWT, Exim, Alpha Vantage, OpenAI, Signal, Web(CORS) 설정
-│   ├── controller/     # Auth, ExchangeRate, Stock, Signal, Ai
-│   ├── service/        # AuthService, ExchangeRateService, StockService, SignalService, AiAnalysisService, OpenAiService, EmailService
-│   ├── repository/     # Spring Data JPA 리포지토리
-│   ├── entity/          # User, ExchangeRateCache, FavoriteStock, StockSignal, ChatHistory
-│   ├── dto/              # request / response
-│   ├── security/        # JwtTokenProvider, JwtAuthenticationFilter, UserPrincipal
-│   └── exception/        # ErrorCode, CustomException, GlobalExceptionHandler
-├── src/main/resources/
-│   ├── application.yml          # 공통 설정 (env var 참조)
-│   ├── application-local.yml    # 로컬 MySQL
-│   └── application-prod.yml     # 운영(RDS) 설정
-├── frontend/
-│   └── src/
-│       ├── api/          # axios 인스턴스 + 도메인별 API 모듈
-│       ├── components/   # common / exchange / stock / signal / ai
-│       ├── pages/         # HomePage, StockPage, SignalsPage, AiPage, LoginPage
-│       ├── hooks/, store/
-│       └── App.jsx
-├── Dockerfile               # Backend (gradle 멀티스테이지 빌드)
-├── frontend/Dockerfile      # Frontend (npm build → nginx)
-├── frontend/nginx.conf      # 정적 서빙 + /api 리버스 프록시
-└── docker-compose.yml       # mysql + backend + frontend
+finance-alb-sg  → 인바운드: HTTP 80, HTTPS 443 (0.0.0.0/0)
+finance-ec2-sg  → 인바운드: SSH 22, TCP 8080 (finance-alb-sg 소스)
+RDS SG          → 인바운드: MySQL 3306 (finance-ec2-sg 소스)
 ```
 
 ---
 
-## 실행 방법
+## 구현 기능
 
-### 1. Docker Compose로 전체 스택 실행 (권장)
+### 주식
+- KRX 전체 종목 데이터 로딩 및 시가총액 TOP 조회
+- 종목 검색, 개별 종목 상세 / 히스토리 차트 / 뉴스
+- 코스피/코스닥 시장 지수 위젯
+- 최근 본 종목 (localStorage, 최대 10개)
 
+### 관심종목 / 포트폴리오
+- 관심종목 추가/삭제
+- 보유 수량·평균단가 입력 → 평가손익·수익률 자동 계산
+- 포트폴리오 파이차트 (비중 시각화)
+- 섹터 분석 (업종별 종목 수·비중 바 차트)
+- 정렬 기능 (날짜순 / 이름순 / 수익률순)
+- 투자 메모 (종목별 메모 작성/수정, 최대 500자)
+- 네이버 주식 바로가기 링크
+
+### 알림
+- 목표가 알림 설정 (이상/이하 도달 시)
+- 이메일 알림 (선택적 활성화)
+
+### AI / 시그널
+- AI 종목 분석 (OpenAI 연동)
+- 매수/매도 시그널 생성 (이동평균 골든크로스/데드크로스)
+- AI 채팅
+
+### 기타
+- 환율 조회 (한국수출입은행 API, DB 캐싱)
+- 귀금속 가격 (금/은 시세)
+- 자산 상관관계 분석
+- JWT 인증 (Access Token + Refresh Token)
+- WebSocket 실시간 가격 업데이트
+
+---
+
+## CI/CD 흐름
+
+```
+git push origin main
+  → GitHub Actions 트리거
+  → Gradle clean build (테스트 제외)
+  → SCP로 jar 파일 EC2 전송
+  → SSH로 systemd 재시작
+```
+
+GitHub Secrets: `EC2_HOST` · `EC2_USER` · `EC2_KEY` · `EC2_PORT`
+
+---
+
+## k6 부하테스트 결과
+
+| 시나리오 | 동시 유저 |
+|---|---|
+| warmup | 5명 |
+| normal_load | 20명 (전체 유저 플로우) |
+| stress_test | 50→200명 점진적 증가 |
+| spike_test | 0→200명 급증/급감 |
+
+| 지표 | 결과 |
+|---|---|
+| 평균 응답시간 | 15ms |
+| p(95) 응답시간 | 23ms |
+| 주식 조회 p(90) | 17ms |
+| 최대 동시 유저 | 200명 (안정적) |
+
+---
+
+## 로컬 실행
+
+### 백엔드
 ```bash
-cp .env.example .env   # 값 채우기
-docker compose up --build
+./gradlew bootRun
 ```
 
-- Frontend: http://localhost
-- Backend: 컨테이너 내부 네트워크 (nginx가 `/api`로 프록시)
+필요 환경변수:
+```
+DB_HOST, DB_PORT, DB_NAME, DB_USERNAME, DB_PASSWORD
+JWT_SECRET
+EXIM_API_KEY
+SPRING_PROFILES_ACTIVE=dev
+```
 
-### 2. 로컬 개발 (백엔드/프론트 따로)
-
+### 프론트엔드
 ```bash
-# MySQL에 finance_db 데이터베이스 생성 후
-
-# Backend
-DB_PASSWORD=xxxx EXIM_API_KEY=xxxx ./gradlew bootRun
-
-# Frontend
 cd frontend
-cp .env.example .env.local
 npm install
 npm run dev
 ```
 
 ---
 
-## 환경 변수
-
-`.env.example` 참고. 핵심 변수:
+## 환경변수
 
 | 변수 | 설명 |
-|------|------|
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USERNAME`, `DB_PASSWORD` | MySQL 접속 정보 |
-| `JWT_SECRET` | JWT 서명 키 (운영 환경에서는 반드시 교체) |
+|---|---|
+| `DB_HOST` ~ `DB_PASSWORD` | MySQL 접속 정보 |
+| `JWT_SECRET` | JWT 서명 키 (운영 시 반드시 교체) |
 | `EXIM_API_KEY` | 한국수출입은행 환율 API 키 |
-| `ALPHA_VANTAGE_API_KEY`, `STOCK_MOCK_MODE` | 주식 API 키 / Mock 모드 토글(기본 `true`) |
-| `OPENAI_API_KEY` | 미설정 시 AI 분석은 503, 시그널 해설은 규칙 기반 설명으로 자동 폴백 |
-| `MAIL_USERNAME`, `MAIL_PASSWORD`, `SIGNAL_MAIL_ENABLED` | 시그널 이메일 알림 (Gmail 앱 비밀번호) |
-| `SIGNAL_CRON` | 시그널 자동 생성 스케줄 (기본: 평일 09:30 KST) |
+| `OPENAI_API_KEY` | 미설정 시 AI 기능 비활성화 |
+| `MAIL_USERNAME`, `MAIL_PASSWORD` | 이메일 알림용 Gmail 앱 비밀번호 |
 
 ---
 
-## API 개요
+## API 주요 엔드포인트
 
 | Method | URL | 설명 | 인증 |
-|--------|-----|------|------|
+|---|---|---|---|
 | POST | `/api/auth/signup` | 회원가입 | X |
 | POST | `/api/auth/login` | 로그인 | X |
-| POST | `/api/auth/refresh` | 토큰 갱신 | X |
-| GET | `/api/exchange/today` | 오늘 환율 | X |
-| GET | `/api/exchange/history` | 환율 히스토리 | X |
+| GET | `/api/stock/market/top` | 시가총액 TOP | X |
 | GET | `/api/stock/search` | 종목 검색 | X |
-| GET | `/api/stock/{symbol}` | 종목 시세 | X |
-| GET | `/api/stock/{symbol}/history` | 시세 히스토리 | X |
-| GET/POST | `/api/stock/favorites` | 포트폴리오 조회/추가 | O |
-| PUT | `/api/stock/favorites/{symbol}/holding` | 보유 수량/평단가 수정 | O |
-| DELETE | `/api/stock/favorites/{symbol}` | 즐겨찾기 삭제 | O |
-| GET | `/api/signals` | 전체 시그널 | X |
-| GET | `/api/signals/my` | 내 포트폴리오 시그널 | O |
-| POST | `/api/signals/generate` | 시그널 수동 생성 | O |
-| POST | `/api/ai/analyze` | AI 질의응답 | O |
-| GET/DELETE | `/api/ai/history` | 채팅 히스토리 조회/삭제 | O |
+| GET/POST | `/api/stock/favorites` | 관심종목 조회/추가 | O |
+| PUT | `/api/stock/favorites/{symbol}/holding` | 보유정보 수정 | O |
+| PATCH | `/api/stock/favorites/{symbol}/memo` | 투자 메모 수정 | O |
+| GET | `/api/stock/portfolio/summary` | 포트폴리오 요약 | O |
+| GET | `/api/stock/portfolio/sector-breakdown` | 섹터 분석 | O |
+| GET | `/api/exchange/rates` | 환율 조회 | X |
+| GET | `/api/signals` | 매매 시그널 | X |
+| POST | `/api/ai/analyze` | AI 분석 | O |
 
 ---
 
-## 향후 계획
+## 향후 개선 계획
 
-- [ ] AWS EC2 + RDS 배포
-- [ ] Jenkins + GitHub Webhook CI/CD
-- [ ] Nginx HTTPS (Let's Encrypt)
-- [ ] 단위/통합 테스트 추가
+### AWS 인프라
+- [ ] Multi-AZ RDS — 장애 자동 복구
+- [ ] Read Replica — 읽기 쿼리 분산
+- [ ] Auto Scaling Group — 트래픽 기반 자동 스케일 아웃
+- [ ] AWS Secrets Manager — 환경변수 보안 강화
+- [ ] CloudWatch 알람 — CPU·메모리·RDS 모니터링
+- [ ] ALB HTTP → HTTPS 리다이렉트
+- [ ] ACM 인증서 + 커스텀 도메인
+
+### 기능
+- [ ] 포트폴리오 손익 히스토리 — 날짜별 총 평가금액 추이
+- [ ] 알림 히스토리 — 목표가 달성 기록
+- [ ] 종목 비교 — 두 종목 수익률 나란히 비교
+- [ ] 뉴스 실제 연동 — 현재 Mock → 네이버 뉴스 API
+
+### 보안
+- [ ] JWT_SECRET 강화 — 랜덤 256bit 이상으로 교체
+- [ ] EC2 SSH IP 제한 — GitHub Actions IP 범위로 축소
+- [ ] RDS 비밀번호 Secrets Manager 이관
+
+---
+
+## 주요 트러블슈팅
+
+| 이슈 | 원인 | 해결 |
+|---|---|---|
+| ALB Target Unhealthy | EC2 SG가 ALB SG 트래픽 미허용 | finance-ec2-sg에 finance-alb-sg 소스 추가 |
+| Mixed Content 에러 | CloudFront(HTTPS)에서 EC2(HTTP) 직접 호출 | CloudFront ALB 오리진 추가 + /api/* 동작 생성 |
+| CloudFront 404 | React 라우터 경로를 S3가 모름 | 오류 페이지 403/404 → index.html:200 설정 |
+| Spring Boot 시작 실패 | JavaMailSender 빈 미존재 | Optional<JavaMailSender>로 변경 |
+| Health Check 500 | /api/exchange/rates 외부 API 의존 | /api/stock/market/top으로 변경 |
