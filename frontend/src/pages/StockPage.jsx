@@ -582,6 +582,7 @@ export default function StockPage() {
   const [recentStocks, setRecentStocks] = useState(() => {
     try { return JSON.parse(localStorage.getItem('recentStocks') || '[]') } catch { return [] }
   })
+  const [sortOrder, setSortOrder] = useState('date') // 'date' | 'name' | 'profit'
 
   const loadFavorites = () => {
     if (!isAuthenticated) return
@@ -675,13 +676,38 @@ export default function StockPage() {
             />
           ) : (
             <div className="h-full overflow-y-auto">
+              {favorites.length > 0 && (
+                <div className="flex gap-1 mb-2">
+                  {[
+                    { key: 'date', label: '날짜순' },
+                    { key: 'name', label: '이름순' },
+                    { key: 'profit', label: '수익률순' },
+                  ].map(({ key, label }) => (
+                    <button
+                      key={key}
+                      onClick={() => setSortOrder(key)}
+                      className={`flex-1 rounded py-1 text-xs font-medium transition-colors ${
+                        sortOrder === key
+                          ? 'bg-indigo-600 text-white'
+                          : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
               {favorites.length === 0 ? (
                 <div className="flex h-40 flex-col items-center justify-center text-slate-400">
                   <p className="text-sm">관심종목이 없습니다</p>
                 </div>
               ) : (
                 <div className="space-y-0">
-                  {favorites.map((fav) => {
+                  {[...favorites].sort((a, b) => {
+                    if (sortOrder === 'name') return a.stockName.localeCompare(b.stockName, 'ko')
+                    if (sortOrder === 'profit') return Number(b.profitLossRate ?? 0) - Number(a.profitLossRate ?? 0)
+                    return new Date(b.createdAt) - new Date(a.createdAt)
+                  }).map((fav) => {
                     const isSelected = selectedCode === fav.stockSymbol
                     const hasTarget = fav.targetPrice != null
                     const changeRate = Number(fav.changeRate ?? 0)
